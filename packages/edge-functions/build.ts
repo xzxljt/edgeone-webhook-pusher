@@ -3,8 +3,8 @@ import { readdirSync, statSync, mkdirSync, existsSync, rmSync } from 'fs';
 import { join, relative, dirname } from 'path';
 
 const SRC_DIR = './src';
-// Output to project root dist/edge-functions directory (EdgeOne Pages uses file-system routing)
-const OUT_DIR = '../../dist/edge-functions';
+// Output to project root edge-functions directory (EdgeOne Pages uses file-system routing)
+const OUT_DIR = '../../edge-functions';
 
 // Find all TS files in src directory
 function findTsFiles(dir: string): string[] {

@@ -6,6 +6,7 @@ node_modules/
 dist/
 .output/
 edge-functions/
+node-functions/
 *.tsbuildinfo
 
 # Nuxt

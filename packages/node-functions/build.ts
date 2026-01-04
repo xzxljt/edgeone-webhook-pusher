@@ -1,8 +1,8 @@
 import * as esbuild from 'esbuild';
 import { mkdirSync, existsSync, rmSync } from 'fs';
 
-// Output to project root dist/node-functions directory
-const OUT_DIR = '../../dist/node-functions';
+// Output to project root node-functions directory
+const OUT_DIR = '../../node-functions';
 
 // Clean and create output directory
 if (existsSync(OUT_DIR)) {
@@ -40,7 +40,7 @@ await esbuild.build({
     js: '// EdgeOne Node Functions - Webhook Handler\n// Route: /send/*\n',
   },
 });
-console.log('✓ Webhook: dist/node-functions/send/[[default]].js -> /send/*');
+console.log('✓ Webhook: node-functions/send/[[default]].js -> /send/*');
 
 // Build API handler: /api/* -> [[default]].js
 mkdirSync(`${OUT_DIR}/api`, { recursive: true });
@@ -52,7 +52,7 @@ await esbuild.build({
     js: '// EdgeOne Node Functions - API Handler\n// Route: /api/*\n',
   },
 });
-console.log('✓ API: dist/node-functions/api/[[default]].js -> /api/*');
+console.log('✓ API: node-functions/api/[[default]].js -> /api/*');
 
 // Note: EdgeOne Pages uses file-system routing, no meta.json needed
 // Routes are automatically generated from directory structure:
