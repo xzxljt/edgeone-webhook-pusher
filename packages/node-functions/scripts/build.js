@@ -4,7 +4,8 @@ import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const baseOutDir = `${__dirname}/../../../.output/public/node-functions`;
+// Node functions should be at project root (not in .output)
+const baseOutDir = `${__dirname}/../../../node-functions`;
 
 // Clean and create output directories
 if (existsSync(baseOutDir)) {

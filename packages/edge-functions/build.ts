@@ -1,11 +1,11 @@
 import * as esbuild from 'esbuild';
-import { readdirSync, statSync, mkdirSync, existsSync } from 'fs';
-import { join, relative, dirname } from 'path';
+import { readdirSync, statSync, mkdirSync, existsSync, rmSync } from 'fs';
+import { join, relative } from 'path';
 
 const SRC_DIR = './src';
-const OUT_DIR = '../../.output/public/edge-functions';
+const OUT_DIR = '../../edge-functions';
 
-// Find all TypeScript files in src directory
+// Find all TS files in src directory
 function findTsFiles(dir: string): string[] {
   const files: string[] = [];
 
@@ -24,39 +24,34 @@ function findTsFiles(dir: string): string[] {
 }
 
 async function build() {
-  const isWatch = process.argv.includes('--watch');
+  // Clean output directory
+  if (existsSync(OUT_DIR)) {
+    rmSync(OUT_DIR, { recursive: true });
+  }
+  mkdirSync(OUT_DIR, { recursive: true });
 
-  // Ensure output directory exists
-  if (!existsSync(OUT_DIR)) {
-    mkdirSync(OUT_DIR, { recursive: true });
+  const sourceFiles = findTsFiles(SRC_DIR);
+  console.log(`Building ${sourceFiles.length} edge functions...`);
+
+  for (const srcFile of sourceFiles) {
+    const relativePath = relative(SRC_DIR, srcFile);
+    const outFile = join(OUT_DIR, relativePath.replace(/\.ts$/, '.js'));
+
+    await esbuild.build({
+      entryPoints: [srcFile],
+      outfile: outFile,
+      bundle: false,
+      format: 'esm',
+      target: 'es2023',
+      platform: 'browser',
+      minify: false,
+      sourcemap: false,
+    });
+
+    console.log(`  ✓ ${relativePath.replace(/\.ts$/, '.js')}`);
   }
 
-  const entryPoints = findTsFiles(SRC_DIR);
-
-  console.log(`Building ${entryPoints.length} edge functions...`);
-
-  const ctx = await esbuild.context({
-    entryPoints,
-    outdir: OUT_DIR,
-    bundle: false,
-    format: 'esm',
-    target: 'es2023',
-    platform: 'neutral',
-    sourcemap: false,
-    minify: false,
-    outExtension: { '.js': '.js' },
-    // Preserve directory structure
-    outbase: SRC_DIR,
-  });
-
-  if (isWatch) {
-    console.log('Watching for changes...');
-    await ctx.watch();
-  } else {
-    await ctx.rebuild();
-    await ctx.dispose();
-    console.log('Build complete!');
-  }
+  console.log('Build complete!');
 }
 
 build().catch((err) => {

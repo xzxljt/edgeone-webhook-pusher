@@ -7,6 +7,10 @@ dist/
 .output/
 *.tsbuildinfo
 
+# EdgeOne Functions (built to project root)
+/edge-functions/
+/node-functions/
+
 # Nuxt
 .nuxt/
 .nitro/
