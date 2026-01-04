@@ -20,7 +20,7 @@
   "scripts": {
     "dev": "edgeone pages dev",
     "dev:console": "turbo dev --filter=console",
-    "build": "turbo build && turbo build:functions",
+    "build": "turbo build:functions && turbo build --filter=console",
     "build:functions": "turbo build:functions",
     "test": "turbo test",
     "lint": "turbo lint",
