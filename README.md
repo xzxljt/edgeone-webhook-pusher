@@ -1,30 +1,30 @@
 # EdgeOne Webhook Pusher
 
-Serverless webhook push service built on Tencent EdgeOne Edge Functions. Supports multiple notification channels with edge-native performance.
+基于腾讯云 EdgeOne Edge Functions 构建的 Serverless Webhook 推送服务，支持多渠道消息通知，具备边缘原生的低延迟性能。
 
-## Features
+## 特性
 
-- 🚀 **Edge-Native** - Built on EdgeOne Edge Functions for global low-latency
-- 📱 **WeChat Template Message** - First supported channel (more coming soon)
-- 🔑 **Simple API** - Server酱-style webhook API: `/{sendKey}.send?title=xxx`
-- 💾 **Persistent** - EdgeOne KV Storage for data persistence
-- 🎛️ **Web Console** - Nuxt 4 powered management console
-- 🆓 **Free Tier** - Runs entirely on EdgeOne free quota
+- 🚀 **边缘原生** - 基于 EdgeOne Edge Functions，全球低延迟
+- 📱 **多渠道支持** - 微信模板消息（更多渠道即将支持）
+- 🔑 **简单 API** - 一个 URL 即可推送：`/{sendKey}.send?title=xxx`
+- 💾 **持久化存储** - EdgeOne KV 存储，数据安全可靠
+- 🎛️ **Web 控制台** - Nuxt 4 + TDesign 构建的管理界面
+- 🆓 **免费额度** - 完全运行在 EdgeOne 免费额度内
 
-## Supported Channels
+## 支持的渠道
 
-### Current (v1.0)
-- ✅ WeChat Template Message (微信模板消息)
+### 当前版本 (v1.0)
+- ✅ 微信模板消息
 
-### Planned
-- ⏳ WeChat Work (企业微信)
-- ⏳ DingTalk (钉钉)
-- ⏳ Feishu (飞书)
+### 计划中
+- ⏳ 企业微信
+- ⏳ 钉钉
+- ⏳ 飞书
 - ⏳ Telegram
 - ⏳ Bark (iOS)
-- ⏳ Custom Webhook
+- ⏳ 自定义 Webhook
 
-## Architecture
+## 架构
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -44,54 +44,54 @@ Serverless webhook push service built on Tencent EdgeOne Edge Functions. Support
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Quick Start
+## 快速开始
 
-### Prerequisites
+### 环境要求
 
 - Node.js 20+
-- pnpm 9+ (required, npm/yarn not supported)
+- pnpm 9+（必须使用 pnpm）
 - EdgeOne CLI (`pnpm add -g edgeone`)
 
-### Installation
+### 安装
 
 ```bash
-# Clone the repository
+# 克隆仓库
 git clone https://github.com/ixNieStudio/edgeone-webhook-pusher.git
 cd edgeone-webhook-pusher
 
-# Install dependencies (pnpm only)
+# 安装依赖
 pnpm install
 
-# Build all packages
+# 构建所有包
 pnpm build
 ```
 
-### Development
+### 本地开发
 
 ```bash
-# Start local development server
-edgeone pages dev
+# 启动本地开发服务器
+pnpm dev
 
-# Run tests
+# 运行测试
 pnpm test
 ```
 
-### Deployment
+### 部署
 
 ```bash
-# Build for production
+# 构建生产版本
 pnpm build
 
-# Deploy to EdgeOne Pages
-edgeone pages deploy .output/public
+# 部署到 EdgeOne Pages
+pnpm deploy
 ```
 
-## Usage
+## 使用方法
 
-### Send a Push Notification
+### 发送推送通知
 
 ```bash
-# GET request
+# GET 请求
 curl "https://your-domain.com/{sendKey}.send?title=Hello&desp=World"
 
 # POST JSON
@@ -104,42 +104,43 @@ curl -X POST "https://your-domain.com/{sendKey}.send" \
   -d "title=Hello&desp=World"
 ```
 
-### API Reference
+### API 参考
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/{sendKey}.send` | GET/POST | Send push notification |
-| `/api/channels` | GET/POST | List/Add channels |
-| `/api/channels/{id}` | GET/PUT/DELETE | Channel CRUD |
-| `/api/messages` | GET | Message history |
-| `/api/messages/{id}` | GET | Message detail |
-| `/api/user/sendkey` | GET/POST | Get/Regenerate SendKey |
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/{sendKey}.send` | GET/POST | 发送推送通知 |
+| `/api/channels` | GET/POST | 渠道列表/添加 |
+| `/api/channels/{id}` | GET/PUT/DELETE | 渠道 CRUD |
+| `/api/messages` | GET | 消息历史 |
+| `/api/messages/{id}` | GET | 消息详情 |
+| `/api/user` | GET | 获取用户信息 |
+| `/api/user/regenerate` | POST | 重新生成 SendKey |
 
-## Project Structure
+## 项目结构
 
 ```
 edgeone-webhook-pusher/
 ├── packages/
-│   ├── shared/           # Shared types and channel adapters
-│   ├── edge-functions/   # Edge Functions (KV persistence layer)
-│   ├── node-functions/   # Node Functions (Koa backend)
-│   └── console/          # Nuxt 4 web console
-├── .output/public/       # Build output (deploy to EdgeOne)
+│   ├── shared/           # 共享类型和渠道适配器
+│   ├── edge-functions/   # Edge Functions (KV 持久化层)
+│   ├── node-functions/   # Node Functions (Koa 后端)
+│   └── console/          # Nuxt 4 Web 控制台
+├── .output/public/       # 构建输出（部署到 EdgeOne）
 │   ├── index.html
 │   ├── edge-functions/
 │   └── node-functions/
 └── ...
 ```
 
-## Tech Stack
+## 技术栈
 
 - **Monorepo**: pnpm workspaces + Turborepo
-- **Language**: TypeScript
-- **Frontend**: Nuxt 4 + Nuxt UI
-- **Backend**: Koa.js (Node Functions)
-- **Persistence**: EdgeOne KV Storage (Edge Functions)
-- **Testing**: Vitest + fast-check
+- **语言**: TypeScript
+- **前端**: Nuxt 4 + TDesign Vue Next
+- **后端**: Koa.js (Node Functions)
+- **持久化**: EdgeOne KV Storage (Edge Functions)
+- **测试**: Vitest + fast-check
 
-## License
+## 许可证
 
 MIT
