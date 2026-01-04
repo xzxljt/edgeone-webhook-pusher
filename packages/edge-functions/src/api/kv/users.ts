@@ -22,7 +22,8 @@ interface EventContext {
   env: Record<string, unknown>;
 }
 
-export async function fetch(request: Request): Promise<Response> {
+export async function onRequest(context: EventContext): Promise<Response> {
+  const { request } = context;
   const url = new URL(request.url);
   const action = url.searchParams.get('action');
 
