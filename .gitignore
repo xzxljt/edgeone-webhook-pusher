@@ -1,12 +1,9 @@
 # Dependencies
 node_modules/
-.pnpm-store/
 
 # Build outputs
 dist/
 .output/
-edge-functions/
-node-functions/
 *.tsbuildinfo
 
 # Nuxt
@@ -23,10 +20,10 @@ node-functions/
 *.swo
 *.sublime-*
 .code/
-.kiro/
 .cursor/
 .trae/
 .windsurf/
+.kiro/
 
 # Environment
 .env
@@ -55,16 +52,14 @@ coverage/
 .vitest/
 *.lcov
 
-# Turbo
-.turbo/
-
 # EdgeOne
 .edgeone/
 .tef_dist/
 
-# Lock files (only keep pnpm-lock.yaml)
+# Lock files
 package-lock.json
 yarn.lock
+pnpm-lock.yaml
 
 # Temp files
 *.tmp
@@ -77,10 +72,3 @@ yarn.lock
 *.pid
 *.seed
 *.pid.lock
-
-# Tencent Cloud EdgeOne
-.env
-.edgeone/*
-!.edgeone/project.json
-.tef_dist/*
-  

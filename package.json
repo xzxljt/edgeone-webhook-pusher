@@ -2,6 +2,7 @@
   "name": "edgeone-webhook-pusher",
   "version": "1.0.0",
   "description": "Serverless webhook push service built on Tencent EdgeOne Edge Functions",
+  "type": "module",
   "author": {
     "name": "colin@ixNieStudio",
     "email": "colin@ixnie.cn"
@@ -11,23 +12,25 @@
     "type": "git",
     "url": "https://github.com/ixNieStudio/edgeone-webhook-pusher.git"
   },
-  "private": true,
-  "packageManager": "pnpm@9.15.0",
+  "packageManager": "yarn@1.22.22",
   "engines": {
-    "node": ">=22",
-    "pnpm": ">=9"
+    "node": ">=20"
   },
   "scripts": {
-    "dev:console": "turbo dev --filter=console",
-    "build": "turbo build --filter=console && turbo build:functions",
-    "build:functions": "turbo build:functions",
-    "test": "turbo test",
-    "lint": "turbo lint",
-    "clean": "turbo clean && rimraf dist edge-functions node-functions .output .turbo"
+    "build": "node build.js",
+    "dev:console": "cd console && yarn dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "koa": "^3.0.0",
+    "@koa/router": "^13.1.0",
+    "koa-bodyparser": "^4.4.1"
   },
   "devDependencies": {
     "rimraf": "^6.0.1",
-    "turbo": "^2.3.0",
-    "typescript": "^5.7.2"
+    "vitest": "^2.1.8",
+    "fast-check": "^3.23.2"
   }
 }
