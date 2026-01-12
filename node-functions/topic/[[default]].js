@@ -1,11 +1,11 @@
 /**
- * EdgeOne Node Functions - Webhook Handler (Koa)
- * Route: /send/* and /*.send
+ * EdgeOne Node Functions - Topic Webhook Handler (Koa)
+ * Route: /topic/* and /*.topic
  * Feature: multi-tenant-refactor
  *
- * Handles webhook-style push requests:
- * - /:sendKey.send?title=xxx&desp=xxx
- * - /send/:sendKey?title=xxx&desp=xxx
+ * Handles webhook-style topic push requests:
+ * - /:topicKey.topic?title=xxx&desp=xxx
+ * - /topic/:topicKey?title=xxx&desp=xxx
  *
  * @see https://github.com/TencentEdgeOne/koa-template
  */
@@ -13,7 +13,7 @@
 import Koa from 'koa';
 import Router from '@koa/router';
 import bodyParser from 'koa-bodyparser';
-import { ErrorCodes, ErrorMessages, errorResponse, getHttpStatus } from '../shared/error-codes.js';
+import { ErrorCodes, errorResponse, getHttpStatus } from '../shared/error-codes.js';
 import { sanitizeInput } from '../shared/utils.js';
 import { pushService } from '../services/push.js';
 
@@ -51,16 +51,16 @@ app.use(async (ctx, next) => {
   try {
     await next();
   } catch (err) {
-    console.error('Webhook error:', err);
+    console.error('Topic webhook error:', err);
     ctx.status = err.status || 500;
     ctx.body = errorResponse(err.code || ErrorCodes.INTERNAL_ERROR, err.message);
   }
 });
 
 /**
- * Handle push request
+ * Handle topic push request
  */
-async function handlePush(ctx, sendKey) {
+async function handleTopicPush(ctx, topicKey) {
   // Merge GET params and POST body
   const query = ctx.query;
   const body = ctx.request.body || {};
@@ -80,9 +80,9 @@ async function handlePush(ctx, sendKey) {
   const sanitizedDesp = desp ? sanitizeInput(desp) : undefined;
 
   // Execute push
-  const result = await pushService.pushBySendKey(sendKey, sanitizedTitle, sanitizedDesp);
+  const result = await pushService.pushByTopicKey(topicKey, sanitizedTitle, sanitizedDesp);
 
-  if (!result.success) {
+  if (result.error) {
     ctx.status = getHttpStatus(result.error);
     ctx.body = errorResponse(result.error);
     return;
@@ -93,20 +93,18 @@ async function handlePush(ctx, sendKey) {
     message: 'success',
     data: {
       pushId: result.pushId,
-      results: [
-        {
-          success: result.success,
-          msgId: result.msgId,
-        },
-      ],
+      total: result.total,
+      success: result.success,
+      failed: result.failed,
+      results: result.results,
     },
   };
 }
 
-// Route: /send/:sendKey
-router.all('/:sendKey', async (ctx) => {
-  const { sendKey } = ctx.params;
-  await handlePush(ctx, sendKey);
+// Route: /topic/:topicKey
+router.all('/:topicKey', async (ctx) => {
+  const { topicKey } = ctx.params;
+  await handleTopicPush(ctx, topicKey);
 });
 
 // Use router middleware
