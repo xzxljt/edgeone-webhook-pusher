@@ -1,4 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+import { cpSync } from 'fs';
+import { resolve } from 'path';
 import Components from 'unplugin-vue-components/vite';
 import AutoImport from 'unplugin-auto-import/vite';
 import { TDesignResolver } from 'unplugin-vue-components/resolvers';
@@ -10,16 +12,41 @@ export default defineNuxtConfig({
   // SPA mode
   ssr: false,
 
-  // Output to dist directory (relative to project root)
+  // Output configuration
   nitro: {
     output: {
-      publicDir: '../dist',
+      dir: 'dist',
+      publicDir: 'dist',
     },
     preset: 'static',
     compressPublicAssets: true,
     prerender: {
       crawlLinks: false,
       routes: ['/'],
+    },
+  },
+
+  // Copy edge-functions and node-functions after build
+  hooks: {
+    'nitro:build:public-assets': () => {
+      const rootDir = process.cwd();
+      const distDir = resolve(rootDir, 'dist');
+
+      // Copy edge-functions
+      cpSync(
+        resolve(rootDir, 'edge-functions'),
+        resolve(distDir, 'edge-functions'),
+        { recursive: true }
+      );
+
+      // Copy node-functions
+      cpSync(
+        resolve(rootDir, 'node-functions'),
+        resolve(distDir, 'node-functions'),
+        { recursive: true }
+      );
+
+      console.log('✓ Copied edge-functions and node-functions to dist/');
     },
   },
 

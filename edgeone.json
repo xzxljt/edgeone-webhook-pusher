@@ -1,7 +1,7 @@
 {
   "name": "edgeone-webhook-pusher",
-  "buildCommand": "node build.js",
-  "installCommand": "yarn install && cd console && yarn install",
+  "buildCommand": "yarn build",
+  "installCommand": "yarn install",
   "outputDirectory": "dist",
-  "nodeVersion": "20"
+  "nodeVersion": "22.17.1"
 }
