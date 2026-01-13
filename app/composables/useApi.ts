@@ -250,6 +250,10 @@ export function useApi() {
     return request('DELETE', `/topics/${topicId}/subscribe/${openIdRef}`);
   }
 
+  async function getTopicSubscribers(topicId: string): Promise<ApiResponse<string[]>> {
+    return request('GET', `/topics/${topicId}/subscribers`);
+  }
+
   // ============ OpenID APIs ============
 
   async function getOpenIds(): Promise<ApiResponse<OpenIdData[]>> {
@@ -266,7 +270,7 @@ export function useApi() {
     page?: number;
     pageSize?: number;
     type?: 'single' | 'topic';
-  }): Promise<ApiResponse<{ messages: MessageData[]; total: number }>> {
+  }): Promise<ApiResponse<MessageData[]> & { pagination?: { total: number; page: number; pageSize: number } }> {
     const query = new URLSearchParams();
     if (params?.page) query.set('page', String(params.page));
     if (params?.pageSize) query.set('pageSize', String(params.pageSize));
@@ -309,6 +313,7 @@ export function useApi() {
     updateTopic,
     deleteTopic,
     unsubscribeTopic,
+    getTopicSubscribers,
     // OpenIDs
     getOpenIds,
     deleteOpenId,

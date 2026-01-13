@@ -16,6 +16,7 @@ const id = computed(() => route.params.id as string);
 // State
 const loading = ref(true);
 const topic = ref<any>(null);
+const subscribers = ref<any[]>([]);
 const qrCodeUrl = ref('');
 const showEditDialog = ref(false);
 const editForm = ref({ name: '' });
@@ -29,11 +30,35 @@ async function fetchTopic() {
     topic.value = res.data;
     editForm.value.name = topic.value.name;
     await generateQRCode();
+    // Fetch subscriber details
+    await fetchSubscribers();
   } catch (e: any) {
     MessagePlugin.error(e.message || '获取 Topic 详情失败');
     router.push('/topics');
   } finally {
     loading.value = false;
+  }
+}
+
+// Fetch subscriber details
+async function fetchSubscribers() {
+  if (!topic.value?.subscriberRefs?.length) {
+    subscribers.value = [];
+    return;
+  }
+  
+  try {
+    // Get all OpenIDs and filter by subscriberRefs
+    const openIdsRes = await api.getOpenIds();
+    if (openIdsRes.data) {
+      const openIdMap = new Map(openIdsRes.data.map((o: any) => [o.id, o]));
+      subscribers.value = topic.value.subscriberRefs
+        .map((ref: string) => openIdMap.get(ref))
+        .filter(Boolean);
+    }
+  } catch (e) {
+    console.error('Failed to fetch subscribers:', e);
+    subscribers.value = [];
   }
 }
 
@@ -55,7 +80,7 @@ async function generateQRCode() {
 // Get subscribe URL
 function getSubscribeUrl() {
   const origin = window.location.origin;
-  return `${origin}/subscribe/${topic.value.id}`;
+  return `${origin}/v1/subscribe/${topic.value.id}`;
 }
 
 // Get webhook URL
@@ -203,14 +228,14 @@ onMounted(() => {
 
         <!-- Subscribers List -->
         <t-card title="订阅者列表" class="subscribers-card">
-          <div v-if="!topic.subscribers?.length" class="empty-subscribers">
+          <div v-if="!subscribers.length" class="empty-subscribers">
             <Icon icon="mdi:account-group-outline" class="empty-icon" />
             <p>暂无订阅者</p>
             <p class="tip">分享订阅二维码让用户扫码订阅</p>
           </div>
 
           <div v-else class="subscriber-list">
-            <div v-for="sub in topic.subscribers" :key="sub.id" class="subscriber-item">
+            <div v-for="sub in subscribers" :key="sub.id" class="subscriber-item">
               <div class="subscriber-info">
                 <Icon icon="mdi:account" class="subscriber-icon" />
                 <div class="subscriber-detail">

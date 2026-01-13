@@ -106,9 +106,12 @@ async function loadMessages() {
     }
     
     const res = await api.getMessages(params);
-    if (res.data) {
-      messages.value = res.data.messages || [];
-      pagination.total = res.data.total || 0;
+    if (res.code === 0) {
+      // Backend returns { data: items[], pagination: { total, page, pageSize } }
+      messages.value = res.data || [];
+      pagination.total = res.pagination?.total || 0;
+    } else {
+      MessagePlugin.error(res.message || '获取消息列表失败');
     }
   } catch (e: any) {
     MessagePlugin.error(e.message || '获取消息列表失败');

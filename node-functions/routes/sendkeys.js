@@ -66,6 +66,7 @@ async function handleList(context) {
 
 /**
  * POST /api/sendkeys - Create SendKey
+ * openIdRef is optional - can bind later via QR code
  */
 async function handleCreate(context) {
   const { request } = context;
@@ -84,24 +85,18 @@ async function handleCreate(context) {
       return errorResponse(ErrorCodes.INVALID_PARAM, 'name is required');
     }
 
-    if (!openIdRef) {
-      return errorResponse(ErrorCodes.INVALID_PARAM, 'openIdRef is required');
+    // openIdRef is optional - verify if provided
+    if (openIdRef) {
+      const openid = await openidService.get(openIdRef);
+      if (!openid) {
+        return errorResponse(ErrorCodes.INVALID_PARAM, 'Referenced OpenID does not exist');
+      }
     }
 
-    // Verify OpenID exists
-    const openid = await openidService.get(openIdRef);
-    if (!openid) {
-      return errorResponse(ErrorCodes.INVALID_PARAM, 'Referenced OpenID does not exist');
-    }
-
-    const data = await sendkeyService.create(name, openIdRef);
+    const data = await sendkeyService.create(name, openIdRef || null);
 
     // Return full key on creation (only time it's shown)
-    return jsonResponse(201, {
-      success: true,
-      data,
-      message: 'SendKey created. Please save the key value securely - it will be masked in future responses.',
-    });
+    return jsonResponse(201, successResponse(data, 'SendKey created. Please save the key value securely.'));
   } catch (error) {
     console.error('Create sendkey error:', error);
     return errorResponse(ErrorCodes.INTERNAL_ERROR, error.message);
@@ -193,6 +188,25 @@ async function handleDelete(context, id) {
 }
 
 /**
+ * POST /api/sendkeys/:id/unbind - Unbind OpenID from SendKey
+ */
+async function handleUnbind(context, id) {
+  try {
+    const success = await sendkeyService.unbind(id);
+    if (!success) {
+      return errorResponse(ErrorCodes.KEY_NOT_FOUND, 'SendKey not found');
+    }
+
+    const data = await sendkeyService.get(id);
+    const maskedData = sendkeyService.maskSendKey(data);
+    return jsonResponse(200, successResponse(maskedData, 'SendKey unbound'));
+  } catch (error) {
+    console.error('Unbind sendkey error:', error);
+    return errorResponse(ErrorCodes.INTERNAL_ERROR, error.message);
+  }
+}
+
+/**
  * Main route handler
  */
 export async function onRequest(context) {
@@ -226,6 +240,14 @@ export async function onRequest(context) {
         default:
           return errorResponse(ErrorCodes.INVALID_PARAM, 'Method not allowed');
       }
+    }
+
+    // Check for /unbind sub-route
+    if (pathname.endsWith('/unbind')) {
+      if (request.method === 'POST') {
+        return handleUnbind(ctx, id);
+      }
+      return errorResponse(ErrorCodes.INVALID_PARAM, 'Method not allowed');
     }
 
     // Item routes: /api/sendkeys/:id
