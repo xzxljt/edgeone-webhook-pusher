@@ -55,7 +55,7 @@ async function generateQRCode() {
 // Get bind URL
 function getBindUrl() {
   const origin = window.location.origin;
-  return `${origin}/bind/${sendKey.value.id}`;
+  return `${origin}/v1/bind/${sendKey.value.id}`;
 }
 
 // Get webhook URL
@@ -120,7 +120,7 @@ async function handleUnbind() {
     body: '确定要解除当前绑定的用户吗？解绑后需要重新扫码绑定。',
     onConfirm: async () => {
       try {
-        await api.updateSendKey(id.value, { openIdRef: null });
+        await api.unbindSendKey(id.value);
         MessagePlugin.success('解绑成功');
         await fetchSendKey();
       } catch (e: any) {

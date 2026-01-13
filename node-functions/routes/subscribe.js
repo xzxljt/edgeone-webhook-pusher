@@ -7,10 +7,11 @@
  * Returns JSON responses for API consumers.
  */
 
-import { configKV } from '../services/kv-client.js';
+import { configKV } from '../shared/kv-client.js';
 import { configService } from '../services/config.js';
-import { topicService } from '../services/topic.js';
-import { openidService } from '../services/openid.js';
+import { topicService } from '../modules/key/topic.service.js';
+import { bindingService } from '../modules/binding/service.js';
+import { OpenIdSource } from '../modules/openid/service.js';
 import { generateId, now } from '../shared/utils.js';
 import { checkUserFollowStatus } from '../services/wechat.js';
 import { ErrorCodes, errorResponse, successResponse } from '../shared/error-codes.js';
@@ -129,47 +130,22 @@ export function registerSubscribeRoutes(router) {
         return;
       }
 
-      // Get user info from OAuth (for nickname)
-      let nickname = null;
-      try {
-        const userInfoUrl = `https://api.weixin.qq.com/sns/userinfo?access_token=${oauthAccessToken}&openid=${openid}&lang=zh_CN`;
-        const userInfoRes = await fetch(userInfoUrl);
-        const userInfo = await userInfoRes.json();
-        if (!userInfo.errcode && userInfo.nickname) {
-          nickname = userInfo.nickname;
-        }
-      } catch (e) {
-        console.warn('Failed to get user info:', e);
-      }
-
-      // Find or create OpenID record
-      let openIdRecord = await openidService.findByOpenId(openid);
-      if (!openIdRecord) {
-        openIdRecord = await openidService.create(openid, nickname);
-      } else if (nickname && !openIdRecord.name) {
-        await openidService.update(openIdRecord.id, { name: nickname });
-        openIdRecord.name = nickname;
-      }
-
-      // Check if already subscribed
-      if (topic.subscriberRefs?.includes(openIdRecord.id)) {
-        ctx.body = successResponse({
-          topicId,
-          topicName: topic.name,
-          openIdRef: openIdRecord.id,
-        }, '您已订阅该 Topic');
+      // Subscribe using binding service
+      const subResult = await bindingService.subscribeToTopic(openid, topicId, OpenIdSource.OAUTH);
+      
+      if (!subResult.success) {
+        ctx.status = 400;
+        ctx.body = errorResponse(ErrorCodes.SUBSCRIBE_FAILED, subResult.error);
         return;
       }
 
-      // Add subscriber to Topic
-      await topicService.subscribe(topicId, openIdRecord.id);
+      // Get updated topic for response
+      const updatedTopic = await topicService.get(topicId);
 
       // Return success
       ctx.body = successResponse({
         topicId,
-        topicName: topic.name,
-        openIdRef: openIdRecord.id,
-        nickname: openIdRecord.name || null,
+        topicName: updatedTopic?.name || topic.name,
       }, '订阅成功');
     } catch (error) {
       console.error('Subscribe callback error:', error);

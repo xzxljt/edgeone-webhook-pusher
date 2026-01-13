@@ -7,10 +7,11 @@
  * Returns JSON responses for API consumers.
  */
 
-import { configKV } from '../services/kv-client.js';
+import { configKV } from '../shared/kv-client.js';
 import { configService } from '../services/config.js';
-import { sendkeyService } from '../services/sendkey.js';
-import { openidService } from '../services/openid.js';
+import { sendkeyService } from '../modules/key/sendkey.service.js';
+import { bindingService } from '../modules/binding/service.js';
+import { OpenIdSource } from '../modules/openid/service.js';
 import { generateId, now } from '../shared/utils.js';
 import { checkUserFollowStatus } from '../services/wechat.js';
 import { ErrorCodes, errorResponse, successResponse } from '../shared/error-codes.js';
@@ -129,38 +130,23 @@ export function registerBindRoutes(router) {
         return;
       }
 
-      // Get user info from OAuth (for nickname)
-      let nickname = null;
-      try {
-        const userInfoUrl = `https://api.weixin.qq.com/sns/userinfo?access_token=${oauthAccessToken}&openid=${openid}&lang=zh_CN`;
-        const userInfoRes = await fetch(userInfoUrl);
-        const userInfo = await userInfoRes.json();
-        if (!userInfo.errcode && userInfo.nickname) {
-          nickname = userInfo.nickname;
-        }
-      } catch (e) {
-        console.warn('Failed to get user info:', e);
+      // Bind using binding service
+      const bindResult = await bindingService.bindToSendKey(openid, sendKeyId, OpenIdSource.OAUTH);
+      
+      if (!bindResult.success) {
+        ctx.status = 400;
+        ctx.body = errorResponse(ErrorCodes.BIND_FAILED, bindResult.error);
+        return;
       }
 
-      // Find or create OpenID record
-      let openIdRecord = await openidService.findByOpenId(openid);
-      if (!openIdRecord) {
-        openIdRecord = await openidService.create(openid, nickname);
-      } else if (nickname && !openIdRecord.name) {
-        // Update nickname if not set
-        await openidService.update(openIdRecord.id, { name: nickname });
-        openIdRecord.name = nickname;
-      }
-
-      // Bind OpenID to SendKey
-      await sendkeyService.update(sendKeyId, { openIdRef: openIdRecord.id });
+      // Get updated sendKey for response
+      const updatedSendKey = await sendkeyService.get(sendKeyId);
 
       // Return success
       ctx.body = successResponse({
         sendKeyId,
-        sendKeyName: sendKey.name,
-        openIdRef: openIdRecord.id,
-        nickname: openIdRecord.name || null,
+        sendKeyName: updatedSendKey?.name || sendKey.name,
+        openIdRef: updatedSendKey?.openIdRef,
       }, '绑定成功');
     } catch (error) {
       console.error('Bind callback error:', error);

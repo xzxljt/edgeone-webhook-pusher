@@ -5,9 +5,9 @@
  * Provides statistics endpoint for the dashboard.
  */
 
-import { sendkeyService } from '../services/sendkey.js';
-import { topicService } from '../services/topic.js';
-import { messageService } from '../services/message.js';
+import { sendkeyService } from '../modules/key/sendkey.service.js';
+import { topicService } from '../modules/key/topic.service.js';
+import { historyService } from '../modules/history/service.js';
 import { successResponse } from '../shared/error-codes.js';
 
 /**
@@ -23,7 +23,7 @@ export function registerStatsRoutes(router) {
     // Get counts
     const sendKeys = await sendkeyService.list();
     const topics = await topicService.list();
-    const messagesResult = await messageService.list({ page: 1, pageSize: 5 });
+    const messagesResult = await historyService.list({ page: 1, pageSize: 5 });
 
     // Format recent messages for dashboard
     const recentMessages = messagesResult.messages.map((msg) => ({

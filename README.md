@@ -16,60 +16,76 @@
 
 ## 架构
 
+### 系统架构
+
 ```mermaid
 graph TB
-    subgraph "Frontend - Nuxt 4"
-        A[Login Page] --> B[Dashboard]
-        B --> C[SendKey Management]
-        B --> D[Topic Management]
-        B --> E[Messages History]
-        B --> F[Settings]
+    subgraph "API Layer - Node Functions"
+        A[Push Routes] --> P[Push Module]
+        B[Admin Routes] --> K[Key Module]
+        B --> C[Channel Module]
+        B --> H[History Module]
+        B --> O[OpenID Module]
+        W[Wechat Routes] --> WH[Wechat Handler]
     end
     
-    subgraph "Node Functions"
-        G[/v1/* API Routes/]
-        H[/bind/* OAuth Routes/]
-        I[/subscribe/* OAuth Routes/]
-        J[/*.send Push Routes/]
-        K[/*.topic Push Routes/]
+    subgraph "Core Modules - Node Functions"
+        P --> K
+        P --> C
+        P --> H
+        P --> R[Rate Limiter]
+        K --> BM[Binding Module]
+        BM --> O
+        WH --> BM
     end
     
-    subgraph "Services"
-        L[Auth Service]
-        M[Config Service]
-        N[SendKey Service]
-        O[Topic Service]
-        P[OpenID Service]
-        Q[Message Service]
+    subgraph "KV Client Layer - Node Functions"
+        K --> KVC[KV Client]
+        O --> KVC
+        H --> KVC
+        C --> KVC
     end
     
-    subgraph "KV Storage"
-        R[(CONFIG_KV)]
-        S[(SENDKEYS_KV)]
-        T[(TOPICS_KV)]
-        U[(OPENIDS_KV)]
-        V[(MESSAGES_KV)]
+    subgraph "Edge Functions - KV Proxy"
+        KVC -->|HTTP| EF[Edge Functions]
+        EF --> KV_CONFIG[/api/kv/config/]
+        EF --> KV_SENDKEYS[/api/kv/sendkeys/]
+        EF --> KV_TOPICS[/api/kv/topics/]
+        EF --> KV_OPENIDS[/api/kv/openids/]
+        EF --> KV_MESSAGES[/api/kv/messages/]
     end
     
-    subgraph "External"
-        W[WeChat API]
-        X[WeChat OAuth]
+    subgraph "Storage Layer - EdgeOne KV"
+        KV_CONFIG --> CONFIG_KV[(CONFIG_KV)]
+        KV_SENDKEYS --> SENDKEYS_KV[(SENDKEYS_KV)]
+        KV_TOPICS --> TOPICS_KV[(TOPICS_KV)]
+        KV_OPENIDS --> OPENIDS_KV[(OPENIDS_KV)]
+        KV_MESSAGES --> MESSAGES_KV[(MESSAGES_KV)]
     end
-    
-    A --> G
-    C --> H
-    D --> I
-    G --> L
-    G --> M
-    G --> N
-    G --> O
-    G --> P
-    G --> Q
-    H --> X
-    I --> X
-    J --> W
-    K --> W
 ```
+
+### 存储层架构说明
+
+由于 EdgeOne KV 只能在 Edge Functions 中直接访问，Node Functions 需要通过 HTTP 调用 Edge Functions 来操作 KV：
+
+1. **Edge Functions (KV Proxy)**: 位于 `edge-functions/api/kv/`，提供 KV 操作的 HTTP 接口
+2. **KV Client**: 位于 `node-functions/shared/kv-client.js`，封装 HTTP 调用，提供统一的 KV 操作接口
+3. **Core Modules**: 通过 KV Client 进行数据持久化，无需关心底层实现
+
+### 模块职责划分
+
+| 模块 | 职责 | 依赖 |
+|------|------|------|
+| Channel Module | 渠道配置管理、渠道适配器注册 | KV Client |
+| Key Module | SendKey/TopicKey 的 CRUD | Binding Module, KV Client |
+| Binding Module | 用户绑定关系管理 | OpenID Module |
+| Push Module | 消息发送核心逻辑 | Key Module, Channel Module, Rate Limiter, History Module |
+| History Module | 消息记录存储和查询 | KV Client |
+| Rate Limiter | 频率限制 | - |
+| OpenID Module | 微信用户数据管理 | KV Client |
+| Wechat Handler | 公众号消息处理 | Binding Module |
+| KV Client | 封装 Edge Functions KV 操作 | Edge Functions (HTTP) |
+| Edge Functions | KV Proxy，提供 KV 操作 HTTP 接口 | EdgeOne KV |
 
 ## 业务流程
 
@@ -348,24 +364,42 @@ curl "https://your-domain.com/{topicKey}.topic?title=系统公告&desp=今晚22�
 
 在 EdgeOne Pages 控制台创建以下 KV 命名空间：
 
-| KV 绑定名称 | 用途 |
-|-------------|------|
-| `CONFIG_KV` | 应用配置（Admin Token、微信凭证、OAuth State） |
-| `SENDKEYS_KV` | SendKey 数据 |
-| `TOPICS_KV` | Topic 数据 |
-| `OPENIDS_KV` | OpenID 数据 |
-| `MESSAGES_KV` | 消息历史 |
+| KV 绑定名称 | 用途 | Key 前缀 |
+|-------------|------|----------|
+| `CONFIG_KV` | 应用配置（Admin Token、微信凭证、OAuth State） | `config:`, `oauth:` |
+| `SENDKEYS_KV` | SendKey 数据 | `sk:`, `sk_idx:` |
+| `TOPICS_KV` | Topic 数据 | `tp:`, `tp_idx:` |
+| `OPENIDS_KV` | OpenID 数据 | `oid:`, `oid_idx:` |
+| `MESSAGES_KV` | 消息历史 | `msg:`, `msg_idx:` |
 
-### KV 操作规范
+### KV Proxy 接口
 
-所有 KV 操作严格遵守 EdgeOne 格式：
+Node Functions 通过 Edge Functions 提供的 KV Proxy 接口操作 KV：
+
+| 方法 | 路径 | 描述 |
+|------|------|------|
+| GET | `/api/kv/{namespace}?action=get&key=xxx` | 获取单个值 |
+| POST | `/api/kv/{namespace}?action=put` | 存储值（body: `{ key, value, ttl? }`） |
+| GET | `/api/kv/{namespace}?action=delete&key=xxx` | 删除值 |
+| GET | `/api/kv/{namespace}?action=list&prefix=xxx&limit=256&cursor=xxx` | 列出 keys |
+
+### KV Client 使用
 
 ```javascript
-// 正确的 KV 操作方式
-await CONFIG_KV.get('config');
-await CONFIG_KV.put('config', JSON.stringify(data));
-await CONFIG_KV.delete('config');
-await CONFIG_KV.list({ prefix: 'sk:' });
+// node-functions/shared/kv-client.js
+import { configKV, sendkeysKV, topicsKV, openidsKV, messagesKV } from './kv-client.js';
+
+// 获取值
+const data = await sendkeysKV.get('sk:sk_abc123');
+
+// 存储值
+await sendkeysKV.put('sk:sk_abc123', { id: 'sk_abc123', name: 'test' });
+
+// 删除值
+await sendkeysKV.delete('sk:sk_abc123');
+
+// 列出所有 keys（自动处理分页）
+const keys = await sendkeysKV.listAll('sk:');
 ```
 
 ## 技术栈
@@ -378,6 +412,17 @@ await CONFIG_KV.list({ prefix: 'sk:' });
 - **持久化**: EdgeOne KV
 - **测试**: Vitest + fast-check
 - **包管理**: Yarn
+
+## 更新日志
+
+### 2026-01-14
+
+- 修复前端管理界面与后端 API 接口不匹配问题
+- SendKey 创建时 `openIdRef` 改为可选参数
+- 添加 `POST /v1/sendkeys/:id/unbind` 解绑端点
+- 修复绑定/订阅 URL 路径（添加 `/v1` 前缀）
+- 修复消息列表 API 响应解析
+- 修复 Topic 订阅者列表数据获取
 
 ## 许可证
 

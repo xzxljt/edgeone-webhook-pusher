@@ -8,7 +8,7 @@
  * All routes require Admin Token authentication
  */
 
-import { messageService } from '../services/message.js';
+import { historyService } from '../modules/history/service.js';
 import { withAdminAuth } from '../middleware/admin-auth.js';
 import { ErrorCodes, errorResponse as createErrorBody, successResponse, getHttpStatus } from '../shared/error-codes.js';
 
@@ -68,11 +68,11 @@ async function handleList(context) {
       return errorResponse(ErrorCodes.INVALID_PARAM, 'pageSize must be between 1 and 100');
     }
 
-    const result = await messageService.list({ type, page, pageSize });
+    const result = await historyService.list({ type, page, pageSize });
 
     return jsonResponse(200, {
       success: true,
-      data: result.messages,
+      data: result.items,
       pagination: {
         total: result.total,
         page: result.page,
@@ -91,7 +91,7 @@ async function handleList(context) {
  */
 async function handleGet(context, id) {
   try {
-    const message = await messageService.get(id);
+    const message = await historyService.get(id);
     if (!message) {
       return errorResponse(ErrorCodes.MESSAGE_NOT_FOUND, 'Message not found');
     }

@@ -2,6 +2,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import fc from 'fast-check';
 import { DefaultConfig, KVKeys } from '../node-functions/shared/types.js';
 
+// Define OpenIdSource locally to avoid import issues with mocking
+const OpenIdSource = {
+  OAUTH: 'oauth',
+  MESSAGE: 'message',
+};
+
 /**
  * Mock KV storage for testing
  */
@@ -43,7 +49,7 @@ const mockSendkeysKV = createMockKV();
 const mockTopicsKV = createMockKV();
 const mockOpenidsKV = createMockKV();
 
-vi.mock('../node-functions/services/kv-client.js', () => ({
+vi.mock('../node-functions/shared/kv-client.js', () => ({
   configKV: mockConfigKV,
   sendkeysKV: mockSendkeysKV,
   topicsKV: mockTopicsKV,
@@ -53,9 +59,9 @@ vi.mock('../node-functions/services/kv-client.js', () => ({
 
 // Import services after mocking
 const { configService } = await import('../node-functions/services/config.js');
-const { openidService } = await import('../node-functions/services/openid.js');
-const { sendkeyService } = await import('../node-functions/services/sendkey.js');
-const { topicService } = await import('../node-functions/services/topic.js');
+const { openidService } = await import('../node-functions/modules/openid/service.js');
+const { sendkeyService } = await import('../node-functions/modules/key/sendkey.service.js');
+const { topicService } = await import('../node-functions/modules/key/topic.service.js');
 
 /**
  * Property-Based Tests for Services
@@ -363,7 +369,7 @@ describe('Service Layer Properties', () => {
       const openId = 'oXXXX_test_user';
       const name = 'Test User';
 
-      const created = await openidService.create(openId, name);
+      const created = await openidService.create(openId, OpenIdSource.MESSAGE, name);
       expect(created.openId).toBe(openId);
       expect(created.name).toBe(name);
 
@@ -376,7 +382,7 @@ describe('Service Layer Properties', () => {
       mockOpenidsKV.clear();
 
       const openId = 'oXXXX_find_test';
-      const created = await openidService.create(openId);
+      const created = await openidService.create(openId, OpenIdSource.MESSAGE);
 
       const found = await openidService.findByOpenId(openId);
       expect(found).not.toBeNull();
@@ -387,9 +393,9 @@ describe('Service Layer Properties', () => {
       mockOpenidsKV.clear();
 
       const openId = 'oXXXX_duplicate';
-      await openidService.create(openId);
+      await openidService.create(openId, OpenIdSource.MESSAGE);
 
-      await expect(openidService.create(openId)).rejects.toThrow('OpenID already exists');
+      await expect(openidService.create(openId, OpenIdSource.MESSAGE)).rejects.toThrow('OpenID already exists');
     });
   });
 });

@@ -9,7 +9,7 @@
  * No authentication required - only validates TopicKey existence
  */
 
-import { pushService } from '../services/push.js';
+import { pushService } from '../modules/push/service.js';
 import { ErrorCodes, ErrorMessages } from '../shared/types.js';
 
 /**
