@@ -9,9 +9,9 @@
  */
 
 import { configService } from '../services/config.js';
-import { sendkeyService } from '../services/sendkey.js';
-import { topicService } from '../services/topic.js';
-import { openidService } from '../services/openid.js';
+import { bindingService } from '../modules/binding/service.js';
+import { commandParser, CommandAction } from '../modules/binding/commands.js';
+import { openidService, OpenIdSource } from '../modules/openid/service.js';
 import { getUserInfo } from '../services/wechat.js';
 import crypto from 'crypto';
 
@@ -92,7 +92,7 @@ async function handleSubscribe(openId) {
   
   let openIdRecord = await openidService.findByOpenId(openId);
   if (!openIdRecord) {
-    await openidService.create(openId, userInfo?.nickname);
+    openIdRecord = await openidService.create(openId, OpenIdSource.MESSAGE, userInfo?.nickname);
   } else if (userInfo?.nickname && !openIdRecord.name) {
     await openidService.update(openIdRecord.id, { name: userInfo.nickname });
   }
@@ -114,49 +114,31 @@ async function handleSubscribe(openId) {
  * Handle text message for binding
  */
 async function handleTextMessage(openId, content) {
-  // Check for bind command: "绑定 SCTxxx" or "bind SCTxxx"
-  const bindMatch = content.match(/^(绑定|bind)\s+(\S+)$/i);
-  if (bindMatch) {
-    const key = bindMatch[2];
-    return await handleBindSendKey(openId, key);
-  }
-
-  // Check for subscribe command: "订阅 TPKxxx" or "subscribe TPKxxx"
-  const subMatch = content.match(/^(订阅|subscribe)\s+(\S+)$/i);
-  if (subMatch) {
-    const key = subMatch[2];
-    return await handleSubscribeTopic(openId, key);
-  }
-
-  // Check for unbind command: "解绑 SCTxxx" or "unbind SCTxxx"
-  const unbindMatch = content.match(/^(解绑|unbind)\s+(\S+)$/i);
-  if (unbindMatch) {
-    const key = unbindMatch[2];
-    return await handleUnbindSendKey(openId, key);
-  }
-
-  // Check for unsubscribe command: "退订 TPKxxx" or "unsubscribe TPKxxx"
-  const unsubMatch = content.match(/^(退订|unsubscribe)\s+(\S+)$/i);
-  if (unsubMatch) {
-    const key = unsubMatch[2];
-    return await handleUnsubscribeTopic(openId, key);
+  // Parse command using command parser
+  const command = commandParser.parse(content);
+  
+  if (command) {
+    const { action, key } = command;
+    
+    if (action === CommandAction.BIND) {
+      return await handleBindSendKey(openId, key);
+    }
+    if (action === CommandAction.SUBSCRIBE) {
+      return await handleSubscribeTopic(openId, key);
+    }
+    if (action === CommandAction.UNBIND) {
+      return await handleUnbindSendKey(openId, key);
+    }
+    if (action === CommandAction.UNSUBSCRIBE) {
+      return await handleUnsubscribeTopic(openId, key);
+    }
   }
 
   // Help message for unrecognized commands
   if (content.includes('帮助') || content.toLowerCase() === 'help') {
     return `📖 使用帮助
 
-绑定 SendKey：
-  发送 "绑定 SCTxxxxx"
-
-订阅 Topic：
-  发送 "订阅 TPKxxxxx"
-
-解绑 SendKey：
-  发送 "解绑 SCTxxxxx"
-
-退订 Topic：
-  发送 "退订 TPKxxxxx"`;
+${commandParser.getHelpMessage()}`;
   }
 
   return null; // No reply for other messages
@@ -166,41 +148,23 @@ async function handleTextMessage(openId, content) {
  * Handle SendKey binding via message
  */
 async function handleBindSendKey(openId, key) {
-  // Find SendKey by key
-  const sendKey = await sendkeyService.findByKey(key);
-  if (!sendKey) {
-    return `❌ 绑定失败
+  const result = await bindingService.bindToSendKeyByKey(openId, key, OpenIdSource.MESSAGE);
+  
+  if (!result.success) {
+    if (result.error === 'KEY_NOT_FOUND') {
+      return `❌ 绑定失败
 
 未找到 SendKey: ${key}
 请检查 Key 是否正确。`;
-  }
-
-  // Get or create OpenID record
-  const userInfo = await getUserInfo(openId);
-  let openIdRecord = await openidService.findByOpenId(openId);
-  if (!openIdRecord) {
-    openIdRecord = await openidService.create(openId, userInfo?.nickname);
-  }
-
-  // Check if already bound
-  if (sendKey.openIdRef === openIdRecord.id) {
-    return `ℹ️ 您已绑定到 "${sendKey.name}"，无需重复绑定。`;
-  }
-
-  // Check if SendKey is bound to another user
-  if (sendKey.openIdRef) {
+    }
     return `❌ 绑定失败
 
-该 SendKey 已被其他用户绑定。
-如需更换绑定，请联系管理员。`;
+${result.error}`;
   }
-
-  // Bind
-  await sendkeyService.update(sendKey.id, { openIdRef: openIdRecord.id });
 
   return `✅ 绑定成功
 
-您已成功绑定到 "${sendKey.name}"
+您已成功绑定到该 SendKey
 现在可以接收消息推送了。`;
 }
 
@@ -208,33 +172,23 @@ async function handleBindSendKey(openId, key) {
  * Handle Topic subscription via message
  */
 async function handleSubscribeTopic(openId, key) {
-  // Find Topic by key
-  const topic = await topicService.findByKey(key);
-  if (!topic) {
-    return `❌ 订阅失败
+  const result = await bindingService.subscribeToTopicByKey(openId, key, OpenIdSource.MESSAGE);
+  
+  if (!result.success) {
+    if (result.error === 'KEY_NOT_FOUND') {
+      return `❌ 订阅失败
 
 未找到 Topic: ${key}
 请检查 Key 是否正确。`;
-  }
+    }
+    return `❌ 订阅失败
 
-  // Get or create OpenID record
-  const userInfo = await getUserInfo(openId);
-  let openIdRecord = await openidService.findByOpenId(openId);
-  if (!openIdRecord) {
-    openIdRecord = await openidService.create(openId, userInfo?.nickname);
+${result.error}`;
   }
-
-  // Check if already subscribed
-  if (topic.subscriberRefs?.includes(openIdRecord.id)) {
-    return `ℹ️ 您已订阅 "${topic.name}"，无需重复订阅。`;
-  }
-
-  // Subscribe
-  await topicService.addSubscriber(topic.id, openIdRecord.id);
 
   return `✅ 订阅成功
 
-您已成功订阅 "${topic.name}"
+您已成功订阅该 Topic
 现在可以接收该主题的消息推送了。`;
 }
 
@@ -242,56 +196,54 @@ async function handleSubscribeTopic(openId, key) {
  * Handle SendKey unbinding via message
  */
 async function handleUnbindSendKey(openId, key) {
-  // Find SendKey by key
-  const sendKey = await sendkeyService.findByKey(key);
-  if (!sendKey) {
-    return `❌ 解绑失败
+  const result = await bindingService.unbindFromSendKeyByKey(openId, key);
+  
+  if (!result.success) {
+    if (result.error === 'KEY_NOT_FOUND') {
+      return `❌ 解绑失败
 
 未找到 SendKey: ${key}`;
-  }
-
-  // Get OpenID record
-  const openIdRecord = await openidService.findByOpenId(openId);
-  if (!openIdRecord || sendKey.openIdRef !== openIdRecord.id) {
-    return `❌ 解绑失败
+    }
+    if (result.error === 'NOT_BOUND') {
+      return `❌ 解绑失败
 
 您未绑定到该 SendKey。`;
-  }
+    }
+    return `❌ 解绑失败
 
-  // Unbind
-  await sendkeyService.update(sendKey.id, { openIdRef: null });
+${result.error}`;
+  }
 
   return `✅ 解绑成功
 
-您已从 "${sendKey.name}" 解绑。`;
+您已从该 SendKey 解绑。`;
 }
 
 /**
  * Handle Topic unsubscription via message
  */
 async function handleUnsubscribeTopic(openId, key) {
-  // Find Topic by key
-  const topic = await topicService.findByKey(key);
-  if (!topic) {
-    return `❌ 退订失败
+  const result = await bindingService.unsubscribeFromTopicByKey(openId, key);
+  
+  if (!result.success) {
+    if (result.error === 'KEY_NOT_FOUND') {
+      return `❌ 退订失败
 
 未找到 Topic: ${key}`;
-  }
-
-  // Get OpenID record
-  const openIdRecord = await openidService.findByOpenId(openId);
-  if (!openIdRecord || !topic.subscriberRefs?.includes(openIdRecord.id)) {
-    return `❌ 退订失败
+    }
+    if (result.error === 'NOT_SUBSCRIBED') {
+      return `❌ 退订失败
 
 您未订阅该 Topic。`;
-  }
+    }
+    return `❌ 退订失败
 
-  // Unsubscribe
-  await topicService.removeSubscriber(topic.id, openIdRecord.id);
+${result.error}`;
+  }
 
   return `✅ 退订成功
 
-您已退订 "${topic.name}"。`;
+您已退订该 Topic。`;
 }
 
 /**

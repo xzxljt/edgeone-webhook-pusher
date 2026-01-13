@@ -13,6 +13,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import fc from 'fast-check';
 import { ErrorCodes } from '../node-functions/shared/types.js';
 
+// Define OpenIdSource locally to avoid import issues with mocking
+const OpenIdSource = {
+  OAUTH: 'oauth',
+  MESSAGE: 'message',
+};
+
 /**
  * Mock KV storage for testing
  */
@@ -55,7 +61,7 @@ const mockTopicsKV = createMockKV();
 const mockOpenidsKV = createMockKV();
 const mockMessagesKV = createMockKV();
 
-vi.mock('../node-functions/services/kv-client.js', () => ({
+vi.mock('../node-functions/shared/kv-client.js', () => ({
   configKV: mockConfigKV,
   sendkeysKV: mockSendkeysKV,
   topicsKV: mockTopicsKV,
@@ -64,7 +70,7 @@ vi.mock('../node-functions/services/kv-client.js', () => ({
 }));
 
 // Mock channel registry to avoid actual WeChat API calls
-vi.mock('../node-functions/shared/channels/registry.js', () => ({
+vi.mock('../node-functions/modules/channel/adapters/registry.js', () => ({
   sendViaChannel: vi.fn().mockResolvedValue({
     success: true,
     externalId: 'mock_msg_id_123',
@@ -74,15 +80,18 @@ vi.mock('../node-functions/shared/channels/registry.js', () => ({
     name: 'WeChat Template',
     description: 'Mock adapter',
   }),
+  getSensitiveFields: vi.fn().mockReturnValue(['appSecret']),
+  validateChannelCredentials: vi.fn().mockResolvedValue({ valid: true }),
+  getAllChannelsInfo: vi.fn().mockReturnValue([]),
 }));
 
 // Import services and middleware after mocking
 const { authService } = await import('../node-functions/services/auth.js');
 const { configService } = await import('../node-functions/services/config.js');
-const { sendkeyService } = await import('../node-functions/services/sendkey.js');
-const { topicService } = await import('../node-functions/services/topic.js');
-const { openidService } = await import('../node-functions/services/openid.js');
-const { pushService } = await import('../node-functions/services/push.js');
+const { sendkeyService } = await import('../node-functions/modules/key/sendkey.service.js');
+const { topicService } = await import('../node-functions/modules/key/topic.service.js');
+const { openidService } = await import('../node-functions/modules/openid/service.js');
+const { pushService } = await import('../node-functions/modules/push/service.js');
 const { adminAuthMiddleware, extractToken } = await import('../node-functions/middleware/admin-auth.js');
 
 // Helper to create mock request
@@ -220,7 +229,7 @@ describe('API Authentication Properties', () => {
       await setupInitializedState();
 
       // Create OpenID and SendKey
-      const openIdData = await openidService.create('oXXXX_test_user', 'Test User');
+      const openIdData = await openidService.create('oXXXX_test_user', OpenIdSource.MESSAGE, 'Test User');
       const sendKeyData = await sendkeyService.create('Test Key', openIdData.id);
 
       // Push without token
@@ -317,7 +326,7 @@ describe('Push API Properties', () => {
             await setupInitializedState();
 
             // Create OpenID and SendKey
-            const openIdData = await openidService.create(`oXXXX_${keyName}`, keyName);
+            const openIdData = await openidService.create(`oXXXX_${keyName}`, OpenIdSource.MESSAGE, keyName);
             const sendKeyData = await sendkeyService.create(keyName, openIdData.id);
 
             // Push message
@@ -361,7 +370,7 @@ describe('Push API Properties', () => {
 
             // Create subscribers
             for (let i = 0; i < subscriberCount; i++) {
-              const openIdData = await openidService.create(`oXXXX_${topicName}_${i}`, `User ${i}`);
+              const openIdData = await openidService.create(`oXXXX_${topicName}_${i}`, OpenIdSource.MESSAGE, `User ${i}`);
               await topicService.subscribe(topicData.id, openIdData.id);
             }
 

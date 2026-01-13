@@ -14,8 +14,8 @@
  * All routes require Admin Token authentication
  */
 
-import { topicService } from '../services/topic.js';
-import { openidService } from '../services/openid.js';
+import { topicService } from '../modules/key/topic.service.js';
+import { openidService } from '../modules/openid/service.js';
 import { withAdminAuth } from '../middleware/admin-auth.js';
 import { ErrorCodes, errorResponse as createErrorBody, successResponse, getHttpStatus } from '../shared/error-codes.js';
 

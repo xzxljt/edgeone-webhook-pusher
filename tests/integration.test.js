@@ -10,6 +10,12 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+// Define OpenIdSource locally to avoid import issues with mocking
+const OpenIdSource = {
+  OAUTH: 'oauth',
+  MESSAGE: 'message',
+};
+
 /**
  * Mock KV storage for testing
  */
@@ -52,7 +58,7 @@ const mockTopicsKV = createMockKV();
 const mockOpenidsKV = createMockKV();
 const mockMessagesKV = createMockKV();
 
-vi.mock('../node-functions/services/kv-client.js', () => ({
+vi.mock('../node-functions/shared/kv-client.js', () => ({
   configKV: mockConfigKV,
   sendkeysKV: mockSendkeysKV,
   topicsKV: mockTopicsKV,
@@ -61,7 +67,7 @@ vi.mock('../node-functions/services/kv-client.js', () => ({
 }));
 
 // Mock channel registry
-vi.mock('../node-functions/shared/channels/registry.js', () => ({
+vi.mock('../node-functions/modules/channel/adapters/registry.js', () => ({
   sendViaChannel: vi.fn().mockResolvedValue({
     success: true,
     externalId: 'mock_msg_id_123',
@@ -71,16 +77,19 @@ vi.mock('../node-functions/shared/channels/registry.js', () => ({
     name: 'WeChat Template',
     description: 'Mock adapter',
   }),
+  getSensitiveFields: vi.fn().mockReturnValue(['appSecret']),
+  validateChannelCredentials: vi.fn().mockResolvedValue({ valid: true }),
+  getAllChannelsInfo: vi.fn().mockReturnValue([]),
 }));
 
 // Import services after mocking
 const { authService } = await import('../node-functions/services/auth.js');
 const { configService } = await import('../node-functions/services/config.js');
-const { openidService } = await import('../node-functions/services/openid.js');
-const { sendkeyService } = await import('../node-functions/services/sendkey.js');
-const { topicService } = await import('../node-functions/services/topic.js');
-const { pushService } = await import('../node-functions/services/push.js');
-const { messageService } = await import('../node-functions/services/message.js');
+const { openidService } = await import('../node-functions/modules/openid/service.js');
+const { sendkeyService } = await import('../node-functions/modules/key/sendkey.service.js');
+const { topicService } = await import('../node-functions/modules/key/topic.service.js');
+const { pushService } = await import('../node-functions/modules/push/service.js');
+const { historyService } = await import('../node-functions/modules/history/service.js');
 
 describe('Integration Tests', () => {
   beforeEach(() => {
@@ -147,7 +156,7 @@ describe('Integration Tests', () => {
 
     it('should complete SendKey flow: create -> push -> query history', async () => {
       // Step 1: Create OpenID
-      const openIdData = await openidService.create('oXXXX_test_user', 'Test User');
+      const openIdData = await openidService.create('oXXXX_test_user', OpenIdSource.MESSAGE, 'Test User');
       expect(openIdData.id).toBeDefined();
       expect(openIdData.openId).toBe('oXXXX_test_user');
 
@@ -167,19 +176,19 @@ describe('Integration Tests', () => {
       expect(pushResult.success).toBe(true);
 
       // Step 4: Query message history
-      const messages = await messageService.list({ type: 'single' });
+      const messages = await historyService.list({ type: 'single' });
       expect(messages.messages.length).toBe(1);
       expect(messages.messages[0].title).toBe('Server Alert');
       expect(messages.messages[0].type).toBe('single');
 
       // Step 5: Get message detail
-      const message = await messageService.get(pushResult.pushId);
+      const message = await historyService.get(pushResult.pushId);
       expect(message).not.toBeNull();
       expect(message.results[0].success).toBe(true);
     });
 
     it('should handle SendKey update and delete', async () => {
-      const openIdData = await openidService.create('oXXXX_update_test');
+      const openIdData = await openidService.create('oXXXX_update_test', OpenIdSource.MESSAGE);
       const sendKeyData = await sendkeyService.create('Original Name', openIdData.id);
 
       // Update
@@ -210,9 +219,9 @@ describe('Integration Tests', () => {
 
     it('should complete Topic flow: create -> subscribe -> push -> query history', async () => {
       // Step 1: Create OpenIDs
-      const user1 = await openidService.create('oXXXX_user1', 'User 1');
-      const user2 = await openidService.create('oXXXX_user2', 'User 2');
-      const user3 = await openidService.create('oXXXX_user3', 'User 3');
+      const user1 = await openidService.create('oXXXX_user1', OpenIdSource.MESSAGE, 'User 1');
+      const user2 = await openidService.create('oXXXX_user2', OpenIdSource.MESSAGE, 'User 2');
+      const user3 = await openidService.create('oXXXX_user3', OpenIdSource.MESSAGE, 'User 3');
 
       // Step 2: Create Topic
       const topicData = await topicService.create('System Announcements');
@@ -240,7 +249,7 @@ describe('Integration Tests', () => {
       expect(pushResult.failed).toBe(0);
 
       // Step 5: Query message history
-      const messages = await messageService.list({ type: 'topic' });
+      const messages = await historyService.list({ type: 'topic' });
       expect(messages.messages.length).toBe(1);
       expect(messages.messages[0].title).toBe('Maintenance Notice');
       expect(messages.messages[0].type).toBe('topic');
@@ -248,7 +257,7 @@ describe('Integration Tests', () => {
     });
 
     it('should handle unsubscribe', async () => {
-      const user = await openidService.create('oXXXX_unsub_test');
+      const user = await openidService.create('oXXXX_unsub_test', OpenIdSource.MESSAGE);
       const topic = await topicService.create('Test Topic');
 
       await topicService.subscribe(topic.id, user.id);
@@ -308,7 +317,7 @@ describe('Integration Tests', () => {
     });
 
     it('should detect OpenID references in SendKeys', async () => {
-      const openId = await openidService.create('oXXXX_ref_test');
+      const openId = await openidService.create('oXXXX_ref_test', OpenIdSource.MESSAGE);
       await sendkeyService.create('Test Key', openId.id);
 
       const refs = await openidService.checkReferences(openId.id, {
@@ -321,7 +330,7 @@ describe('Integration Tests', () => {
     });
 
     it('should detect OpenID references in Topics', async () => {
-      const openId = await openidService.create('oXXXX_topic_ref');
+      const openId = await openidService.create('oXXXX_topic_ref', OpenIdSource.MESSAGE);
       const topic = await topicService.create('Test Topic');
       await topicService.subscribe(topic.id, openId.id);
 
@@ -348,27 +357,35 @@ describe('Integration Tests', () => {
     });
 
     it('should paginate messages correctly', async () => {
-      const openId = await openidService.create('oXXXX_pagination');
+      const openId = await openidService.create('oXXXX_pagination', OpenIdSource.MESSAGE);
       const sendKey = await sendkeyService.create('Pagination Test', openId.id);
 
-      // Create 5 messages
+      // Create 5 messages with explicit timestamps to ensure ordering
       for (let i = 0; i < 5; i++) {
-        await pushService.pushBySendKey(sendKey.key, `Message ${i + 1}`);
+        await historyService.save({
+          id: `push_page_${i}`,
+          type: 'single',
+          keyId: sendKey.id,
+          title: `Message ${i + 1}`,
+          content: '',
+          results: [{ openId: openId.openId, success: true }],
+          createdAt: new Date(Date.now() + i * 1000).toISOString(), // Ensure different timestamps
+        });
       }
 
       // Get page 1 with pageSize 2
-      const page1 = await messageService.list({ page: 1, pageSize: 2 });
+      const page1 = await historyService.list({ page: 1, pageSize: 2 });
       expect(page1.messages.length).toBe(2);
       expect(page1.total).toBe(5);
       expect(page1.messages[0].title).toBe('Message 5'); // newest first
 
       // Get page 2
-      const page2 = await messageService.list({ page: 2, pageSize: 2 });
+      const page2 = await historyService.list({ page: 2, pageSize: 2 });
       expect(page2.messages.length).toBe(2);
       expect(page2.messages[0].title).toBe('Message 3');
 
       // Get page 3
-      const page3 = await messageService.list({ page: 3, pageSize: 2 });
+      const page3 = await historyService.list({ page: 3, pageSize: 2 });
       expect(page3.messages.length).toBe(1);
       expect(page3.messages[0].title).toBe('Message 1');
     });

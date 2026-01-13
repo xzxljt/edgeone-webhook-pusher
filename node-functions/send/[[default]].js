@@ -15,7 +15,7 @@ import Router from '@koa/router';
 import bodyParser from 'koa-bodyparser';
 import { ErrorCodes, ErrorMessages, errorResponse, getHttpStatus } from '../shared/error-codes.js';
 import { sanitizeInput } from '../shared/utils.js';
-import { pushService } from '../services/push.js';
+import { pushService } from '../modules/push/service.js';
 
 // Create Koa application
 const app = new Koa();

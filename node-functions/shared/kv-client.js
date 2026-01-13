@@ -1,10 +1,34 @@
 /**
  * KV Client - Wrapper for Edge Functions KV API
  * Calls the Edge Functions to perform KV operations
+ * 
+ * 架构说明：
+ * Node Functions 无法直接访问 EdgeOne KV，需要通过 Edge Functions 代理
+ * Edge Functions 位于 edge-functions/api/kv/ 目录
  */
 
 // Base URL for KV API (Edge Functions)
-const KV_BASE_URL = process.env.KV_BASE_URL || '';
+// Default to production domain if KV_BASE_URL is not set
+const KV_BASE_URL = process.env.KV_BASE_URL || 'https://webhook-pusher.ixnie.cn';
+
+// Store for dynamic base URL (set from request context)
+let dynamicBaseUrl = null;
+
+/**
+ * Set the base URL dynamically from request context
+ * @param {string} url - The base URL to use
+ */
+export function setKVBaseUrl(url) {
+  dynamicBaseUrl = url;
+}
+
+/**
+ * Get the current base URL
+ * @returns {string}
+ */
+function getBaseUrl() {
+  return dynamicBaseUrl || KV_BASE_URL;
+}
 
 /**
  * Create a KV client for a specific namespace
@@ -12,8 +36,6 @@ const KV_BASE_URL = process.env.KV_BASE_URL || '';
  * @returns {Object}
  */
 function createKVClient(namespace) {
-  const baseUrl = `${KV_BASE_URL}/api/kv/${namespace}`;
-
   return {
     /**
      * Get value by key
@@ -21,6 +43,7 @@ function createKVClient(namespace) {
      * @returns {Promise<any>}
      */
     async get(key) {
+      const baseUrl = `${getBaseUrl()}/api/kv/${namespace}`;
       const res = await fetch(`${baseUrl}?action=get&key=${encodeURIComponent(key)}`);
       const data = await res.json();
       if (!data.success) {
@@ -37,6 +60,7 @@ function createKVClient(namespace) {
      * @returns {Promise<void>}
      */
     async put(key, value, ttl) {
+      const baseUrl = `${getBaseUrl()}/api/kv/${namespace}`;
       const res = await fetch(`${baseUrl}?action=put`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -54,6 +78,7 @@ function createKVClient(namespace) {
      * @returns {Promise<void>}
      */
     async delete(key) {
+      const baseUrl = `${getBaseUrl()}/api/kv/${namespace}`;
       const res = await fetch(`${baseUrl}?action=delete&key=${encodeURIComponent(key)}`);
       const data = await res.json();
       if (!data.success) {
@@ -69,6 +94,7 @@ function createKVClient(namespace) {
      * @returns {Promise<{ keys: string[], complete: boolean, cursor?: string }>}
      */
     async list(prefix = '', limit = 256, cursor) {
+      const baseUrl = `${getBaseUrl()}/api/kv/${namespace}`;
       const params = new URLSearchParams({
         action: 'list',
         prefix,

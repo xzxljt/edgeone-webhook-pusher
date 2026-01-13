@@ -11,8 +11,8 @@
  * All routes require Admin Token authentication
  */
 
-import { sendkeyService } from '../services/sendkey.js';
-import { openidService } from '../services/openid.js';
+import { sendkeyService } from '../modules/key/sendkey.service.js';
+import { openidService } from '../modules/openid/service.js';
 import { withAdminAuth } from '../middleware/admin-auth.js';
 import { ErrorCodes, errorResponse as createErrorBody, successResponse, getHttpStatus } from '../shared/error-codes.js';
 

@@ -15,6 +15,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import fc from 'fast-check';
 import { KVKeys } from '../node-functions/shared/types.js';
 
+// Define OpenIdSource locally to avoid import issues with mocking
+const OpenIdSource = {
+  OAUTH: 'oauth',
+  MESSAGE: 'message',
+};
+
 /**
  * Mock KV storage for testing
  */
@@ -57,7 +63,7 @@ const mockTopicsKV = createMockKV();
 const mockOpenidsKV = createMockKV();
 const mockMessagesKV = createMockKV();
 
-vi.mock('../node-functions/services/kv-client.js', () => ({
+vi.mock('../node-functions/shared/kv-client.js', () => ({
   configKV: mockConfigKV,
   sendkeysKV: mockSendkeysKV,
   topicsKV: mockTopicsKV,
@@ -69,8 +75,8 @@ vi.mock('../node-functions/services/kv-client.js', () => ({
 let mockWeChatResponses = [];
 let mockWeChatCallCount = 0;
 
-vi.mock('../node-functions/shared/channels/wechat-template.js', async () => {
-  const actual = await vi.importActual('../node-functions/shared/channels/wechat-template.js');
+vi.mock('../node-functions/modules/channel/adapters/wechat-template.js', async () => {
+  const actual = await vi.importActual('../node-functions/modules/channel/adapters/wechat-template.js');
   return {
     ...actual,
     wechatTemplateAdapter: {
@@ -85,12 +91,12 @@ vi.mock('../node-functions/shared/channels/wechat-template.js', async () => {
 });
 
 // Import services after mocking
-const { messageService } = await import('../node-functions/services/message.js');
+const { historyService } = await import('../node-functions/modules/history/service.js');
 const { configService } = await import('../node-functions/services/config.js');
-const { openidService } = await import('../node-functions/services/openid.js');
-const { sendkeyService } = await import('../node-functions/services/sendkey.js');
-const { topicService } = await import('../node-functions/services/topic.js');
-const { pushService } = await import('../node-functions/services/push.js');
+const { openidService } = await import('../node-functions/modules/openid/service.js');
+const { sendkeyService } = await import('../node-functions/modules/key/sendkey.service.js');
+const { topicService } = await import('../node-functions/modules/key/topic.service.js');
+const { pushService } = await import('../node-functions/modules/push/service.js');
 
 // Helper to set up test config
 async function setupConfig() {
@@ -135,7 +141,7 @@ describe('Push Service Properties', () => {
       await setupConfig();
 
       // Create OpenID and SendKey
-      const openId = await openidService.create('oXXXX_test_user', 'Test User');
+      const openId = await openidService.create('oXXXX_test_user', OpenIdSource.MESSAGE, 'Test User');
       const sendKey = await sendkeyService.create('test-key', openId.id);
 
       // Mock successful response
@@ -145,7 +151,7 @@ describe('Push Service Properties', () => {
       const result = await pushService.pushBySendKey(sendKey.key, 'Test Title', 'Test Content');
 
       // Verify message is persisted
-      const message = await messageService.get(result.pushId);
+      const message = await historyService.get(result.pushId);
       expect(message).not.toBeNull();
       expect(message.title).toBe('Test Title');
       expect(message.content).toBe('Test Content');
@@ -159,8 +165,8 @@ describe('Push Service Properties', () => {
       await setupConfig();
 
       // Create OpenIDs and Topic
-      const openId1 = await openidService.create('oXXXX_user1', 'User 1');
-      const openId2 = await openidService.create('oXXXX_user2', 'User 2');
+      const openId1 = await openidService.create('oXXXX_user1', OpenIdSource.MESSAGE, 'User 1');
+      const openId2 = await openidService.create('oXXXX_user2', OpenIdSource.MESSAGE, 'User 2');
       const topic = await topicService.create('test-topic');
       await topicService.subscribe(topic.id, openId1.id);
       await topicService.subscribe(topic.id, openId2.id);
@@ -175,7 +181,7 @@ describe('Push Service Properties', () => {
       const result = await pushService.pushByTopicKey(topic.key, 'Topic Title', 'Topic Content');
 
       // Verify message is persisted with all results
-      const message = await messageService.get(result.pushId);
+      const message = await historyService.get(result.pushId);
       expect(message).not.toBeNull();
       expect(message.type).toBe('topic');
       expect(message.results).toHaveLength(2);
@@ -209,12 +215,12 @@ describe('Push Service Properties', () => {
                 results: [],
                 createdAt: new Date(Date.now() + i * 1000).toISOString(),
               };
-              await messageService.save(msg);
+              await historyService.save(msg);
               messages.push(msg);
             }
 
             // Query messages
-            const result = await messageService.list({ pageSize: 100 });
+            const result = await historyService.list({ pageSize: 100 });
 
             // Verify reverse chronological order
             for (let i = 1; i < result.messages.length; i++) {
@@ -242,7 +248,7 @@ describe('Push Service Properties', () => {
 
       // Create 25 messages
       for (let i = 0; i < 25; i++) {
-        await messageService.save({
+        await historyService.save({
           id: `push_${String(i).padStart(3, '0')}`,
           type: 'single',
           keyId: 'sk_test',
@@ -253,17 +259,17 @@ describe('Push Service Properties', () => {
       }
 
       // Test page 1
-      const page1 = await messageService.list({ page: 1, pageSize: 10 });
+      const page1 = await historyService.list({ page: 1, pageSize: 10 });
       expect(page1.messages).toHaveLength(10);
       expect(page1.total).toBe(25);
       expect(page1.page).toBe(1);
 
       // Test page 2
-      const page2 = await messageService.list({ page: 2, pageSize: 10 });
+      const page2 = await historyService.list({ page: 2, pageSize: 10 });
       expect(page2.messages).toHaveLength(10);
 
       // Test page 3 (partial)
-      const page3 = await messageService.list({ page: 3, pageSize: 10 });
+      const page3 = await historyService.list({ page: 3, pageSize: 10 });
       expect(page3.messages).toHaveLength(5);
 
       // Verify no overlap between pages
@@ -285,7 +291,7 @@ describe('Push Service Properties', () => {
 
       // Create mixed messages
       for (let i = 0; i < 10; i++) {
-        await messageService.save({
+        await historyService.save({
           id: `push_single_${i}`,
           type: 'single',
           keyId: 'sk_test',
@@ -293,7 +299,7 @@ describe('Push Service Properties', () => {
           results: [],
           createdAt: new Date(Date.now() + i * 1000).toISOString(),
         });
-        await messageService.save({
+        await historyService.save({
           id: `push_topic_${i}`,
           type: 'topic',
           keyId: 'tp_test',
@@ -304,8 +310,8 @@ describe('Push Service Properties', () => {
       }
 
       // Filter by type
-      const singleMessages = await messageService.list({ type: 'single', pageSize: 100 });
-      const topicMessages = await messageService.list({ type: 'topic', pageSize: 100 });
+      const singleMessages = await historyService.list({ type: 'single', pageSize: 100 });
+      const topicMessages = await historyService.list({ type: 'topic', pageSize: 100 });
 
       expect(singleMessages.messages.every(m => m.type === 'single')).toBe(true);
       expect(topicMessages.messages.every(m => m.type === 'topic')).toBe(true);
@@ -327,7 +333,7 @@ describe('Push Service Properties', () => {
       // Create multiple OpenIDs and Topic
       const openIds = [];
       for (let i = 0; i < 5; i++) {
-        const oid = await openidService.create(`oXXXX_user${i}`, `User ${i}`);
+        const oid = await openidService.create(`oXXXX_user${i}`, OpenIdSource.MESSAGE, `User ${i}`);
         openIds.push(oid);
       }
 
@@ -363,8 +369,8 @@ describe('Push Service Properties', () => {
       await setupConfig();
 
       // Create OpenIDs and Topic
-      const openId1 = await openidService.create('oXXXX_fail1', 'Fail 1');
-      const openId2 = await openidService.create('oXXXX_fail2', 'Fail 2');
+      const openId1 = await openidService.create('oXXXX_fail1', OpenIdSource.MESSAGE, 'Fail 1');
+      const openId2 = await openidService.create('oXXXX_fail2', OpenIdSource.MESSAGE, 'Fail 2');
       const topic = await topicService.create('fail-topic');
       await topicService.subscribe(topic.id, openId1.id);
       await topicService.subscribe(topic.id, openId2.id);
@@ -405,8 +411,8 @@ describe('Message Service', () => {
         createdAt: new Date().toISOString(),
       };
 
-      await messageService.save(message);
-      const retrieved = await messageService.get(message.id);
+      await historyService.save(message);
+      const retrieved = await historyService.get(message.id);
 
       expect(retrieved).not.toBeNull();
       expect(retrieved.id).toBe(message.id);
@@ -426,16 +432,16 @@ describe('Message Service', () => {
         createdAt: new Date().toISOString(),
       };
 
-      await messageService.save(message);
-      expect(await messageService.get(message.id)).not.toBeNull();
+      await historyService.save(message);
+      expect(await historyService.get(message.id)).not.toBeNull();
 
-      const deleted = await messageService.delete(message.id);
+      const deleted = await historyService.delete(message.id);
       expect(deleted).toBe(true);
-      expect(await messageService.get(message.id)).toBeNull();
+      expect(await historyService.get(message.id)).toBeNull();
     });
 
     it('should return false for non-existent message', async () => {
-      const deleted = await messageService.delete('push_nonexistent');
+      const deleted = await historyService.delete('push_nonexistent');
       expect(deleted).toBe(false);
     });
   });

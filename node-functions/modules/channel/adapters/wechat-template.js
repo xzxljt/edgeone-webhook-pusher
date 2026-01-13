@@ -1,34 +1,25 @@
 /**
  * WeChat Template Message Channel Adapter
- * Feature: multi-tenant-refactor
- *
- * Implements the channel adapter interface for WeChat template messages.
- * Access token is cached in KV storage for stateless operation.
+ * Module: channel
  */
 
-import { configKV } from '../kv-client.js';
+import { configKV } from '../../../shared/kv-client.js';
 
-// KV key for access token cache
 const ACCESS_TOKEN_KEY = 'wechat_access_token';
 
 /**
- * Get WeChat access token with KV caching (stateless)
- * @param {string} appId
- * @param {string} appSecret
- * @returns {Promise<string>}
+ * 获取微信 access_token（带 KV 缓存）
  */
 async function getAccessToken(appId, appSecret) {
-  // Try to get cached token from KV
   try {
     const cached = await configKV.get(ACCESS_TOKEN_KEY);
     if (cached && cached.appId === appId && cached.expiresAt > Date.now()) {
       return cached.accessToken;
     }
   } catch {
-    // Ignore cache read errors, will fetch new token
+    // 忽略缓存读取错误
   }
 
-  // Fetch new access token from WeChat API
   const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${appId}&secret=${appSecret}`;
   const res = await fetch(url);
   const data = await res.json();
@@ -41,7 +32,6 @@ async function getAccessToken(appId, appSecret) {
     throw new Error('Invalid WeChat API response');
   }
 
-  // Cache token in KV (expire 5 minutes early for safety)
   const tokenData = {
     appId,
     accessToken: data.access_token,
@@ -51,43 +41,28 @@ async function getAccessToken(appId, appSecret) {
   try {
     await configKV.put(ACCESS_TOKEN_KEY, tokenData);
   } catch {
-    // Ignore cache write errors, token is still valid
+    // 忽略缓存写入错误
   }
 
   return data.access_token;
 }
 
 /**
- * WeChat Template Message Adapter
- * Implements the ChannelAdapter interface
+ * 微信模板消息适配器
  */
 export const wechatTemplateAdapter = {
-  /** Channel type identifier */
   type: 'wechat-template',
-
-  /** Display name */
   name: '微信模板消息',
-
-  /** Channel description */
   description: '通过微信公众号发送模板消息',
 
   /**
-   * Send message via WeChat template
-   * @param {{ id: string, title: string, content?: string, createdAt: string }} message
-   * @param {Object} credentials - Channel credentials
-   * @param {string} credentials.appId - WeChat AppID
-   * @param {string} credentials.appSecret - WeChat AppSecret
-   * @param {string} credentials.templateId - Template ID
-   * @param {string} credentials.openId - Target user OpenID
-   * @param {string} [credentials.url] - Click URL
-   * @returns {Promise<{ success: boolean, error?: string, externalId?: string }>}
+   * 发送消息
    */
   async send(message, credentials) {
     const { appId, appSecret, templateId, openId, url: clickUrl } = credentials;
 
     try {
       const accessToken = await getAccessToken(appId, appSecret);
-
       const apiUrl = `https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=${accessToken}`;
 
       const res = await fetch(apiUrl, {
@@ -100,10 +75,7 @@ export const wechatTemplateAdapter = {
           data: {
             first: { value: message.title, color: '#173177' },
             keyword1: { value: message.content || '无内容', color: '#173177' },
-            keyword2: {
-              value: new Date(message.createdAt).toLocaleString('zh-CN'),
-              color: '#173177',
-            },
+            keyword2: { value: new Date(message.createdAt).toLocaleString('zh-CN'), color: '#173177' },
             remark: { value: 'Powered by EdgeOne Webhook Pusher', color: '#999999' },
           },
         }),
@@ -113,18 +85,15 @@ export const wechatTemplateAdapter = {
 
       if (data.errcode === 0) {
         return { success: true, externalId: String(data.msgid) };
-      } else {
-        return { success: false, error: `${data.errcode}: ${data.errmsg}` };
       }
+      return { success: false, error: `${data.errcode}: ${data.errmsg}` };
     } catch (error) {
       return { success: false, error: String(error) };
     }
   },
 
   /**
-   * Validate channel credentials
-   * @param {Object} credentials
-   * @returns {Promise<{ valid: boolean, error?: string }>}
+   * 验证凭证
    */
   async validate(credentials) {
     const { appId, appSecret, templateId } = credentials;
@@ -141,65 +110,28 @@ export const wechatTemplateAdapter = {
     }
   },
 
-  /**
-   * Get configuration schema for this channel
-   * @returns {Object}
-   */
   getConfigSchema() {
     return {
-      appId: {
-        type: 'string',
-        label: '公众号 AppID',
-        required: true,
-        description: '微信公众号的 AppID',
-      },
-      appSecret: {
-        type: 'string',
-        label: '公众号 AppSecret',
-        required: true,
-        sensitive: true,
-        description: '微信公众号的 AppSecret',
-      },
-      templateId: {
-        type: 'string',
-        label: '模板消息 ID',
-        required: true,
-        description: '在公众号后台配置的模板消息 ID',
-      },
-      url: {
-        type: 'string',
-        label: '点击跳转链接',
-        required: false,
-        description: '用户点击消息后跳转的链接',
-      },
+      appId: { type: 'string', label: '公众号 AppID', required: true },
+      appSecret: { type: 'string', label: '公众号 AppSecret', required: true, sensitive: true },
+      templateId: { type: 'string', label: '模板消息 ID', required: true },
+      url: { type: 'string', label: '点击跳转链接', required: false },
     };
   },
 
-  /**
-   * Get required credential fields
-   * @returns {string[]}
-   */
   getRequiredFields() {
     return ['appId', 'appSecret', 'templateId'];
   },
 
-  /**
-   * Get sensitive credential fields (should be masked in responses)
-   * @returns {string[]}
-   */
   getSensitiveFields() {
     return ['appSecret'];
   },
 };
 
-/**
- * Clear access token cache (for testing or manual refresh)
- * @returns {Promise<void>}
- */
-export async function clearAccessTokenCache() {
+export async function clearTokenCache() {
   try {
     await configKV.delete(ACCESS_TOKEN_KEY);
   } catch {
-    // Ignore errors
+    // 忽略错误
   }
 }

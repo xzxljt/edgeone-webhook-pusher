@@ -1,4 +1,4 @@
-import { configKV } from './kv-client.js';
+import { configKV } from '../shared/kv-client.js';
 import { now } from '../shared/utils.js';
 import { KVKeys, DefaultConfig } from '../shared/types.js';
 
