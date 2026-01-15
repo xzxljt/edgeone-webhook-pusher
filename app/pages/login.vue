@@ -106,6 +106,7 @@
 </template>
 
 <script setup lang="ts">
+import { Icon } from '@iconify/vue';
 import { MessagePlugin } from 'tdesign-vue-next';
 import { useAuthStore } from '~/stores/auth';
 
@@ -206,7 +207,7 @@ async function handleLogin() {
 
 <style scoped>
 .login-page {
-  min-height: 100vh;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -244,6 +245,12 @@ async function handleLogin() {
 
 .login-card {
   border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  background: var(--td-bg-color-container, #fff);
+}
+
+:deep(.t-card__body) {
+  padding: 32px;
 }
 
 .init-section,

@@ -41,11 +41,11 @@ export async function onRequest(context) {
         if (!body.key) {
           return jsonResponse(400, { success: false, error: 'Missing key in body' });
         }
-        await CHANNELS_KV.put(
-          body.key,
-          JSON.stringify(body.value),
-          body.ttl ? { expirationTtl: body.ttl } : undefined
-        );
+        if (body.value === undefined) {
+          return jsonResponse(400, { success: false, error: 'Missing value in body' });
+        }
+        const options = body.ttl ? { expirationTtl: body.ttl } : {};
+        await CHANNELS_KV.put(body.key, JSON.stringify(body.value), options);
         return jsonResponse(200, { success: true });
       }
 
