@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue';
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
+import type { AppWithCount, Channel, CreateAppInput } from '~/types';
+import { PushModes, MessageTypes } from '~/types';
 
 definePageMeta({
   layout: 'default',
@@ -10,16 +12,16 @@ const api = useApi();
 
 // State
 const loading = ref(true);
-const apps = ref<any[]>([]);
-const channels = ref<any[]>([]);
+const apps = ref<AppWithCount[]>([]);
+const channels = ref<Channel[]>([]);
 const showCreateDialog = ref(false);
-const createForm = ref({
+const createForm = ref<CreateAppInput>({
   name: '',
   channelId: '',
-  pushMode: 'single',
-  messageType: 'normal',
-  templateId: '',
+  pushMode: PushModes.SINGLE,
+  messageType: MessageTypes.NORMAL,
 });
+const templateId = ref('');
 const creating = ref(false);
 
 // Fetch apps and channels
@@ -32,8 +34,9 @@ async function fetchData() {
     ]);
     apps.value = appsRes.data || [];
     channels.value = channelsRes.data || [];
-  } catch (e: any) {
-    MessagePlugin.error(e.message || '获取数据失败');
+  } catch (e: unknown) {
+    const err = e as Error;
+    MessagePlugin.error(err.message || '获取数据失败');
   } finally {
     loading.value = false;
   }
@@ -55,28 +58,29 @@ async function handleCreate() {
     MessagePlugin.warning('请选择渠道');
     return;
   }
-  if (createForm.value.messageType === 'template' && !createForm.value.templateId.trim()) {
+  if (createForm.value.messageType === MessageTypes.TEMPLATE && !templateId.value.trim()) {
     MessagePlugin.warning('模板消息需要填写模板 ID');
     return;
   }
   creating.value = true;
   try {
-    const data: any = {
+    const data: CreateAppInput = {
       name: createForm.value.name.trim(),
       channelId: createForm.value.channelId,
       pushMode: createForm.value.pushMode,
       messageType: createForm.value.messageType,
     };
-    if (createForm.value.messageType === 'template') {
-      data.templateId = createForm.value.templateId.trim();
+    if (createForm.value.messageType === MessageTypes.TEMPLATE) {
+      data.templateId = templateId.value.trim();
     }
     await api.createApp(data);
     MessagePlugin.success('创建成功');
     showCreateDialog.value = false;
     resetCreateForm();
     await fetchData();
-  } catch (e: any) {
-    MessagePlugin.error(e.message || '创建失败');
+  } catch (e: unknown) {
+    const err = e as Error;
+    MessagePlugin.error(err.message || '创建失败');
   } finally {
     creating.value = false;
   }
@@ -86,14 +90,14 @@ function resetCreateForm() {
   createForm.value = {
     name: '',
     channelId: '',
-    pushMode: 'single',
-    messageType: 'normal',
-    templateId: '',
+    pushMode: PushModes.SINGLE,
+    messageType: MessageTypes.NORMAL,
   };
+  templateId.value = '';
 }
 
 // Delete app
-async function handleDelete(item: any) {
+async function handleDelete(item: AppWithCount) {
   const dialog = DialogPlugin.confirm({
     header: '确认删除',
     body: `确定要删除应用 "${item.name}" 吗？此操作将同时删除所有绑定的 OpenID。`,
@@ -103,8 +107,9 @@ async function handleDelete(item: any) {
         await api.deleteApp(item.id);
         MessagePlugin.success('删除成功');
         await fetchData();
-      } catch (e: any) {
-        MessagePlugin.error(e.message || '删除失败');
+      } catch (e: unknown) {
+        const err = e as Error;
+        MessagePlugin.error(err.message || '删除失败');
       }
       dialog.destroy();
     },
@@ -113,12 +118,12 @@ async function handleDelete(item: any) {
 
 // Get push mode label
 function getPushModeLabel(mode: string) {
-  return mode === 'single' ? '单播' : '订阅';
+  return mode === PushModes.SINGLE ? '单播' : '订阅';
 }
 
 // Get message type label
 function getMessageTypeLabel(type: string) {
-  return type === 'template' ? '模板消息' : '普通消息';
+  return type === MessageTypes.TEMPLATE ? '模板消息' : '普通消息';
 }
 
 onMounted(() => {
@@ -210,18 +215,18 @@ onMounted(() => {
         </t-form-item>
         <t-form-item label="推送模式" name="pushMode">
           <t-radio-group v-model="createForm.pushMode">
-            <t-radio value="single">单播（发送给第一个绑定用户）</t-radio>
-            <t-radio value="subscribe">订阅（发送给所有绑定用户）</t-radio>
+            <t-radio :value="PushModes.SINGLE">单播（发送给第一个绑定用户）</t-radio>
+            <t-radio :value="PushModes.SUBSCRIBE">订阅（发送给所有绑定用户）</t-radio>
           </t-radio-group>
         </t-form-item>
         <t-form-item label="消息类型" name="messageType">
           <t-radio-group v-model="createForm.messageType">
-            <t-radio value="normal">普通消息</t-radio>
-            <t-radio value="template">模板消息</t-radio>
+            <t-radio :value="MessageTypes.NORMAL">普通消息</t-radio>
+            <t-radio :value="MessageTypes.TEMPLATE">模板消息</t-radio>
           </t-radio-group>
         </t-form-item>
-        <t-form-item v-if="createForm.messageType === 'template'" label="模板 ID" name="templateId">
-          <t-input v-model="createForm.templateId" placeholder="微信模板消息 ID" />
+        <t-form-item v-if="createForm.messageType === MessageTypes.TEMPLATE" label="模板 ID" name="templateId">
+          <t-input v-model="templateId" placeholder="微信模板消息 ID" />
         </t-form-item>
         <t-form-item>
           <p class="form-tip">

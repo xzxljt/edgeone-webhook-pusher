@@ -2,7 +2,7 @@
  * 前端特有类型定义
  */
 
-import type { Message, DeliveryResult } from './message';
+import type { App } from './app';
 
 /**
  * 统计数据
@@ -50,14 +50,8 @@ export interface MessageQueryParams extends PaginationParams {
 }
 
 /**
- * App 带订阅者数量
+ * App 带订阅者数量（后端 GET /apps 和 GET /apps/:id 返回）
  */
-export interface AppWithCount {
-  id: string;
-  name: string;
-  channelId: string;
-  sendKey: string;
+export interface AppWithCount extends App {
   openIdCount: number;
-  createdAt: string;
-  updatedAt: string;
 }

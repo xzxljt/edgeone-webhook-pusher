@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue';
 import { MessagePlugin } from 'tdesign-vue-next';
+import type { Message, DeliveryResult, PaginatedResponse } from '~/types';
 
 definePageMeta({
   layout: 'default',
@@ -10,10 +11,10 @@ const api = useApi();
 
 // State
 const loading = ref(true);
-const messages = ref<any[]>([]);
+const messages = ref<Message[]>([]);
 const showDetailDialog = ref(false);
-const selectedMessage = ref<any>(null);
-const typeFilter = ref<string>('');
+const selectedMessage = ref<Message | null>(null);
+const appFilter = ref<string>('');
 
 // Pagination
 const pagination = reactive({
@@ -25,18 +26,13 @@ const pagination = reactive({
 // Table columns
 const columns = [
   { 
-    colKey: 'type', 
-    title: '类型', 
-    width: 100,
-  },
-  { 
     colKey: 'title', 
     title: '标题', 
     ellipsis: true,
   },
   { 
-    colKey: 'keyName', 
-    title: '来源', 
+    colKey: 'appId', 
+    title: '应用ID', 
     width: 150,
     ellipsis: true,
   },
@@ -57,31 +53,14 @@ const columns = [
   },
 ];
 
-// Type options
-const typeOptions = [
-  { label: '全部', value: '' },
-  { label: '单发', value: 'single' },
-  { label: '群发', value: 'topic' },
-];
-
 // Format time
 function formatTime(iso: string) {
   if (!iso) return '-';
   return new Date(iso).toLocaleString('zh-CN');
 }
 
-// Get type label
-function getTypeLabel(type: string) {
-  return type === 'single' ? '单发' : '群发';
-}
-
-// Get type theme
-function getTypeTheme(type: string) {
-  return type === 'single' ? 'primary' : 'warning';
-}
-
 // Get status info
-function getStatusInfo(results: any[]) {
+function getStatusInfo(results: DeliveryResult[]) {
   if (!results || results.length === 0) {
     return { label: '未知', theme: 'default' as const };
   }
@@ -97,24 +76,23 @@ function getStatusInfo(results: any[]) {
 async function loadMessages() {
   loading.value = true;
   try {
-    const params: any = {
+    const params = {
       page: pagination.current,
       pageSize: pagination.pageSize,
+      appId: appFilter.value || undefined,
     };
-    if (typeFilter.value) {
-      params.type = typeFilter.value;
-    }
     
     const res = await api.getMessages(params);
-    if (res.code === 0) {
-      // Backend returns { data: items[], pagination: { total, page, pageSize } }
-      messages.value = res.data || [];
-      pagination.total = res.pagination?.total || 0;
+    if (res.code === 0 && res.data) {
+      const data = res.data as PaginatedResponse<Message>;
+      messages.value = data.items || [];
+      pagination.total = data.pagination?.total || 0;
     } else {
       MessagePlugin.error(res.message || '获取消息列表失败');
     }
-  } catch (e: any) {
-    MessagePlugin.error(e.message || '获取消息列表失败');
+  } catch (e: unknown) {
+    const err = e as Error;
+    MessagePlugin.error(err.message || '获取消息列表失败');
   } finally {
     loading.value = false;
   }
@@ -134,7 +112,7 @@ function handleFilterChange() {
 }
 
 // Show detail
-function showDetail(msg: any) {
+function showDetail(msg: Message) {
   selectedMessage.value = msg;
   showDetailDialog.value = true;
 }
@@ -147,12 +125,11 @@ onMounted(loadMessages);
     <div class="page-header">
       <h1>消息历史</h1>
       <div class="filter-bar">
-        <t-select
-          v-model="typeFilter"
-          :options="typeOptions"
-          placeholder="消息类型"
+        <t-input
+          v-model="appFilter"
+          placeholder="按应用ID筛选"
           clearable
-          style="width: 120px"
+          style="width: 200px"
           @change="handleFilterChange"
         />
       </div>
@@ -174,13 +151,6 @@ onMounted(loadMessages);
           :pagination="pagination"
           @page-change="handlePageChange"
         >
-          <template #type="{ row }">
-            <t-tag :theme="getTypeTheme(row.type)" size="small">
-              <Icon :icon="row.type === 'single' ? 'mdi:account' : 'mdi:account-group'" />
-              {{ getTypeLabel(row.type) }}
-            </t-tag>
-          </template>
-
           <template #status="{ row }">
             <t-tag :theme="getStatusInfo(row.results).theme" size="small">
               {{ getStatusInfo(row.results).label }}
@@ -212,19 +182,14 @@ onMounted(loadMessages);
           <t-descriptions-item label="消息ID">
             <code>{{ selectedMessage.id }}</code>
           </t-descriptions-item>
-          <t-descriptions-item label="类型">
-            <t-tag :theme="getTypeTheme(selectedMessage.type)" size="small">
-              {{ getTypeLabel(selectedMessage.type) }}
-            </t-tag>
-          </t-descriptions-item>
-          <t-descriptions-item label="来源">
-            {{ selectedMessage.keyName || selectedMessage.keyId }}
+          <t-descriptions-item label="应用ID">
+            {{ selectedMessage.appId }}
           </t-descriptions-item>
           <t-descriptions-item label="标题">
             {{ selectedMessage.title }}
           </t-descriptions-item>
           <t-descriptions-item label="内容">
-            <pre class="message-content">{{ selectedMessage.content || '无' }}</pre>
+            <pre class="message-content">{{ selectedMessage.desp || '无' }}</pre>
           </t-descriptions-item>
           <t-descriptions-item label="发送时间">
             {{ formatTime(selectedMessage.createdAt) }}
@@ -242,7 +207,6 @@ onMounted(loadMessages);
             <div class="result-info">
               <Icon icon="mdi:account" class="result-icon" />
               <div class="result-detail">
-                <span class="result-name">{{ result.openIdName || '用户' }}</span>
                 <span class="result-openid">{{ result.openId }}</span>
               </div>
             </div>
@@ -253,14 +217,14 @@ onMounted(loadMessages);
         </div>
 
         <t-alert
-          v-if="selectedMessage.results?.some((r: any) => r.error)"
+          v-if="selectedMessage.results?.some((r: DeliveryResult) => r.error)"
           theme="error"
           title="错误信息"
           style="margin-top: 16px"
         >
           <template v-for="(r, i) in selectedMessage.results" :key="i">
             <div v-if="r.error" class="error-item">
-              {{ r.openIdName || r.openId }}: {{ r.error }}
+              {{ r.openId }}: {{ r.error }}
             </div>
           </template>
         </t-alert>
@@ -337,10 +301,6 @@ onMounted(loadMessages);
 .result-detail {
   display: flex;
   flex-direction: column;
-}
-
-.result-name {
-  font-weight: 500;
 }
 
 .result-openid {

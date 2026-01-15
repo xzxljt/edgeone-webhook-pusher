@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue';
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
+import type { Channel, UpdateChannelInput } from '~/types';
 
 definePageMeta({
   layout: 'default',
@@ -14,7 +15,7 @@ const id = computed(() => route.params.id as string);
 
 // State
 const loading = ref(true);
-const channel = ref<any>(null);
+const channel = ref<Channel | null>(null);
 const showEditDialog = ref(false);
 const editForm = ref({
   name: '',
@@ -28,14 +29,17 @@ async function fetchChannel() {
   loading.value = true;
   try {
     const res = await api.getChannel(id.value);
-    channel.value = res.data;
-    editForm.value = {
-      name: channel.value.name,
-      appId: channel.value.config?.appId || '',
-      appSecret: '', // Don't show existing secret
-    };
-  } catch (e: any) {
-    MessagePlugin.error(e.message || '获取渠道详情失败');
+    channel.value = res.data || null;
+    if (channel.value) {
+      editForm.value = {
+        name: channel.value.name,
+        appId: channel.value.config?.appId || '',
+        appSecret: '', // Don't show existing secret
+      };
+    }
+  } catch (e: unknown) {
+    const err = e as Error;
+    MessagePlugin.error(err.message || '获取渠道详情失败');
     router.push('/channels');
   } finally {
     loading.value = false;
@@ -50,22 +54,23 @@ async function handleUpdate() {
   }
   saving.value = true;
   try {
-    const updateData: any = {
+    const updateData: UpdateChannelInput = {
       name: editForm.value.name.trim(),
     };
     // Only update config if appId or appSecret changed
     if (editForm.value.appId.trim() || editForm.value.appSecret.trim()) {
       updateData.config = {
-        appId: editForm.value.appId.trim() || channel.value.config?.appId,
-        appSecret: editForm.value.appSecret.trim() || channel.value.config?.appSecret,
+        appId: editForm.value.appId.trim() || channel.value?.config?.appId,
+        appSecret: editForm.value.appSecret.trim() || channel.value?.config?.appSecret,
       };
     }
     await api.updateChannel(id.value, updateData);
     MessagePlugin.success('更新成功');
     showEditDialog.value = false;
     await fetchChannel();
-  } catch (e: any) {
-    MessagePlugin.error(e.message || '更新失败');
+  } catch (e: unknown) {
+    const err = e as Error;
+    MessagePlugin.error(err.message || '更新失败');
   } finally {
     saving.value = false;
   }
@@ -82,8 +87,9 @@ async function handleDelete() {
         await api.deleteChannel(id.value);
         MessagePlugin.success('删除成功');
         router.push('/channels');
-      } catch (e: any) {
-        MessagePlugin.error(e.message || '删除失败');
+      } catch (e: unknown) {
+        const err = e as Error;
+        MessagePlugin.error(err.message || '删除失败');
       }
       dialog.destroy();
     },
@@ -95,13 +101,13 @@ async function copyToClipboard(text: string, label: string) {
   try {
     await navigator.clipboard.writeText(text);
     MessagePlugin.success(`${label}已复制`);
-  } catch (e) {
+  } catch {
     MessagePlugin.error('复制失败');
   }
 }
 
 // Mask sensitive data
-function maskSecret(secret: string) {
+function maskSecret(secret: string | undefined) {
   if (!secret) return '-';
   if (secret.length <= 8) return '****';
   return secret.slice(0, 4) + '****' + secret.slice(-4);

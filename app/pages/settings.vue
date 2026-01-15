@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue';
 import { MessagePlugin } from 'tdesign-vue-next';
-import type { AppConfig } from '~/composables/useApi';
+import type { SystemConfig } from '~/types';
 
 definePageMeta({
   layout: 'default',
@@ -12,7 +12,7 @@ const api = useApi();
 // State
 const loading = ref(true);
 const saving = ref(false);
-const config = ref<AppConfig | null>(null);
+const config = ref<SystemConfig | null>(null);
 
 // Form data
 const formData = reactive({
@@ -20,7 +20,6 @@ const formData = reactive({
     appId: '',
     appSecret: '',
     templateId: '',
-    msgToken: '',
   },
   rateLimit: {
     perMinute: 5,
@@ -41,12 +40,12 @@ async function loadConfig() {
       formData.wechat.appId = res.data.wechat?.appId || '';
       formData.wechat.appSecret = ''; // Don't show masked secret
       formData.wechat.templateId = res.data.wechat?.templateId || '';
-      formData.wechat.msgToken = res.data.wechat?.msgToken || '';
       formData.rateLimit.perMinute = res.data.rateLimit?.perMinute || 5;
       formData.retention.days = res.data.retention?.days || 30;
     }
-  } catch (e: any) {
-    MessagePlugin.error(e.message || '获取配置失败');
+  } catch (e: unknown) {
+    const err = e as Error;
+    MessagePlugin.error(err.message || '获取配置失败');
   } finally {
     loading.value = false;
   }
@@ -56,39 +55,32 @@ async function loadConfig() {
 async function handleSave() {
   saving.value = true;
   try {
-    const updateData: any = {
+    const updateData: Partial<SystemConfig> = {
       rateLimit: formData.rateLimit,
       retention: formData.retention,
     };
 
     // Only include wechat fields that have values
-    const wechatUpdate: any = {};
-    if (formData.wechat.appId) wechatUpdate.appId = formData.wechat.appId;
-    if (formData.wechat.appSecret) wechatUpdate.appSecret = formData.wechat.appSecret;
-    if (formData.wechat.templateId) wechatUpdate.templateId = formData.wechat.templateId;
-    if (formData.wechat.msgToken) wechatUpdate.msgToken = formData.wechat.msgToken;
+    const wechatUpdate: SystemConfig['wechat'] = {
+      appId: formData.wechat.appId || '',
+      appSecret: formData.wechat.appSecret || '',
+    };
+    if (formData.wechat.templateId) {
+      wechatUpdate.templateId = formData.wechat.templateId;
+    }
     
-    if (Object.keys(wechatUpdate).length > 0) {
+    if (wechatUpdate.appId || wechatUpdate.appSecret) {
       updateData.wechat = wechatUpdate;
     }
 
     await api.updateConfig(updateData);
     MessagePlugin.success('配置已保存');
     await loadConfig();
-  } catch (e: any) {
-    MessagePlugin.error(e.message || '保存失败');
+  } catch (e: unknown) {
+    const err = e as Error;
+    MessagePlugin.error(err.message || '保存失败');
   } finally {
     saving.value = false;
-  }
-}
-
-// Copy to clipboard
-async function copyToClipboard(text: string, label: string) {
-  try {
-    await navigator.clipboard.writeText(text);
-    MessagePlugin.success(`${label}已复制`);
-  } catch (e) {
-    MessagePlugin.error('复制失败');
   }
 }
 
@@ -136,13 +128,6 @@ onMounted(loadConfig);
                 placeholder="请输入消息模板 ID"
               />
             </t-form-item>
-            <t-form-item label="消息Token">
-              <t-input
-                v-model="formData.wechat.msgToken"
-                placeholder="请输入服务器配置 Token"
-              />
-              <span class="form-tip">用于接收公众号消息（绑定指令）</span>
-            </t-form-item>
           </t-form>
         </t-card>
 
@@ -156,7 +141,7 @@ onMounted(loadConfig);
                 :max="100"
                 theme="normal"
               />
-              <span class="form-tip">每个 SendKey/Topic 每分钟最多发送的消息数</span>
+              <span class="form-tip">每个应用每分钟最多发送的消息数</span>
             </t-form-item>
           </t-form>
         </t-card>
@@ -213,22 +198,6 @@ onMounted(loadConfig);
               <t-alert theme="info" style="margin-top: 12px">
                 <template #message>
                   网页授权域名用于扫码绑定功能，请确保已正确配置。
-                </template>
-              </t-alert>
-            </t-collapse-panel>
-            <t-collapse-panel header="如何配置服务器消息接收？">
-              <ol>
-                <li>在微信公众平台进入「设置与开发」-「基本配置」</li>
-                <li>在「服务器配置」中点击「修改配置」</li>
-                <li>URL 填写：<code>https://您的域名/v1/wechat</code></li>
-                <li>Token 填写一个自定义字符串，并同步填入上方「消息Token」</li>
-                <li>EncodingAESKey 随机生成即可</li>
-                <li>消息加解密方式选择「明文模式」</li>
-                <li>点击「启用」完成配置</li>
-              </ol>
-              <t-alert theme="info" style="margin-top: 12px">
-                <template #message>
-                  配置后用户可在公众号内发送「绑定 SCTxxx」或「订阅 TPKxxx」完成绑定。
                 </template>
               </t-alert>
             </t-collapse-panel>

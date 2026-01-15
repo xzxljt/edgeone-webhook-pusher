@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue';
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
+import type { Channel, CreateChannelInput } from '~/types';
+import { ChannelTypes } from '~/types';
 
 definePageMeta({
   layout: 'default',
@@ -10,13 +12,15 @@ const api = useApi();
 
 // State
 const loading = ref(true);
-const channels = ref<any[]>([]);
+const channels = ref<Channel[]>([]);
 const showCreateDialog = ref(false);
-const createForm = ref({
+const createForm = ref<CreateChannelInput>({
   name: '',
-  type: 'wechat',
-  appId: '',
-  appSecret: '',
+  type: ChannelTypes.WECHAT,
+  config: {
+    appId: '',
+    appSecret: '',
+  },
 });
 const creating = ref(false);
 
@@ -26,8 +30,9 @@ async function fetchChannels() {
   try {
     const res = await api.getChannels();
     channels.value = res.data || [];
-  } catch (e: any) {
-    MessagePlugin.error(e.message || '获取渠道列表失败');
+  } catch (e: unknown) {
+    const err = e as Error;
+    MessagePlugin.error(err.message || '获取渠道列表失败');
   } finally {
     loading.value = false;
   }
@@ -39,30 +44,24 @@ async function handleCreate() {
     MessagePlugin.warning('请输入渠道名称');
     return;
   }
-  if (!createForm.value.appId.trim()) {
+  if (!createForm.value.config.appId.trim()) {
     MessagePlugin.warning('请输入 AppID');
     return;
   }
-  if (!createForm.value.appSecret.trim()) {
+  if (!createForm.value.config.appSecret.trim()) {
     MessagePlugin.warning('请输入 AppSecret');
     return;
   }
   creating.value = true;
   try {
-    await api.createChannel({
-      name: createForm.value.name.trim(),
-      type: createForm.value.type,
-      config: {
-        appId: createForm.value.appId.trim(),
-        appSecret: createForm.value.appSecret.trim(),
-      },
-    });
+    await api.createChannel(createForm.value);
     MessagePlugin.success('创建成功');
     showCreateDialog.value = false;
     resetCreateForm();
     await fetchChannels();
-  } catch (e: any) {
-    MessagePlugin.error(e.message || '创建失败');
+  } catch (e: unknown) {
+    const err = e as Error;
+    MessagePlugin.error(err.message || '创建失败');
   } finally {
     creating.value = false;
   }
@@ -71,14 +70,16 @@ async function handleCreate() {
 function resetCreateForm() {
   createForm.value = {
     name: '',
-    type: 'wechat',
-    appId: '',
-    appSecret: '',
+    type: ChannelTypes.WECHAT,
+    config: {
+      appId: '',
+      appSecret: '',
+    },
   };
 }
 
 // Delete channel
-async function handleDelete(item: any) {
+async function handleDelete(item: Channel) {
   const dialog = DialogPlugin.confirm({
     header: '确认删除',
     body: `确定要删除渠道 "${item.name}" 吗？如果有应用关联此渠道，将无法删除。`,
@@ -88,8 +89,9 @@ async function handleDelete(item: any) {
         await api.deleteChannel(item.id);
         MessagePlugin.success('删除成功');
         await fetchChannels();
-      } catch (e: any) {
-        MessagePlugin.error(e.message || '删除失败');
+      } catch (e: unknown) {
+        const err = e as Error;
+        MessagePlugin.error(err.message || '删除失败');
       }
       dialog.destroy();
     },
@@ -166,14 +168,14 @@ onMounted(() => {
         </t-form-item>
         <t-form-item label="渠道类型" name="type">
           <t-select v-model="createForm.type" disabled>
-            <t-option value="wechat" label="微信公众号" />
+            <t-option :value="ChannelTypes.WECHAT" label="微信公众号" />
           </t-select>
         </t-form-item>
         <t-form-item label="AppID" name="appId">
-          <t-input v-model="createForm.appId" placeholder="微信公众号 AppID" />
+          <t-input v-model="createForm.config.appId" placeholder="微信公众号 AppID" />
         </t-form-item>
         <t-form-item label="AppSecret" name="appSecret">
-          <t-input v-model="createForm.appSecret" type="password" placeholder="微信公众号 AppSecret" />
+          <t-input v-model="createForm.config.appSecret" type="password" placeholder="微信公众号 AppSecret" />
         </t-form-item>
         <t-form-item>
           <p class="form-tip">

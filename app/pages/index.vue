@@ -9,7 +9,7 @@
               <Icon icon="mdi:broadcast" />
             </div>
             <div class="stat-info">
-              <div class="stat-value">{{ stats.channelCount }}</div>
+              <div class="stat-value">{{ stats.channels }}</div>
               <div class="stat-label">渠道</div>
             </div>
           </div>
@@ -31,7 +31,7 @@
               <Icon icon="mdi:application" />
             </div>
             <div class="stat-info">
-              <div class="stat-value">{{ stats.appCount }}</div>
+              <div class="stat-value">{{ stats.apps }}</div>
               <div class="stat-label">应用</div>
             </div>
           </div>
@@ -53,7 +53,7 @@
               <Icon icon="mdi:message-text" />
             </div>
             <div class="stat-info">
-              <div class="stat-value">{{ stats.messageCount }}</div>
+              <div class="stat-value">{{ stats.messages }}</div>
               <div class="stat-label">消息总数</div>
             </div>
           </div>
@@ -88,43 +88,19 @@
         </t-card>
       </t-col>
 
-      <!-- Recent Messages -->
+      <!-- OpenID Stats -->
       <t-col :span="24">
         <t-card :bordered="false">
           <template #header>
             <div class="card-header">
-              <span>最近消息</span>
-              <t-button
-                theme="default"
-                variant="text"
-                @click="router.push('/messages')"
-              >
-                查看全部 <Icon icon="mdi:arrow-right" />
-              </t-button>
+              <span>订阅者统计</span>
             </div>
           </template>
-
-          <t-loading :loading="loading">
-            <t-table
-              v-if="stats.recentMessages.length > 0"
-              :data="stats.recentMessages"
-              :columns="messageColumns"
-              row-key="id"
-              hover
-              size="small"
-            >
-              <template #success="{ row }">
-                <t-tag :theme="row.success ? 'success' : 'danger'" variant="light" size="small">
-                  <Icon :icon="row.success ? 'mdi:check' : 'mdi:close'" />
-                  {{ row.success ? '成功' : '失败' }}
-                </t-tag>
-              </template>
-              <template #createdAt="{ row }">
-                {{ formatTime(row.createdAt) }}
-              </template>
-            </t-table>
-            <t-empty v-else description="暂无消息记录" />
-          </t-loading>
+          <div class="openid-stat">
+            <Icon icon="mdi:account-group" class="openid-icon" />
+            <span class="openid-count">{{ stats.openIds }}</span>
+            <span class="openid-label">总订阅者</span>
+          </div>
         </t-card>
       </t-col>
     </t-row>
@@ -132,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import type { StatsData } from '~/composables/useApi';
+import type { StatsData } from '~/types';
 import { Icon } from '@iconify/vue';
 
 definePageMeta({
@@ -144,21 +120,11 @@ const router = useRouter();
 
 const loading = ref(true);
 const stats = ref<StatsData>({
-  channelCount: 0,
-  appCount: 0,
-  messageCount: 0,
-  recentMessages: [],
+  channels: 0,
+  apps: 0,
+  openIds: 0,
+  messages: 0,
 });
-
-const messageColumns = [
-  { colKey: 'title', title: '标题', ellipsis: true },
-  { colKey: 'success', title: '状态', width: 80, cell: 'success' },
-  { colKey: 'createdAt', title: '时间', width: 160, cell: 'createdAt' },
-];
-
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleString('zh-CN');
-}
 
 onMounted(async () => {
   const res = await api.getStats();
@@ -236,5 +202,25 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.openid-stat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.openid-icon {
+  font-size: 32px;
+  color: var(--td-brand-color);
+}
+
+.openid-count {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.openid-label {
+  color: var(--td-text-color-secondary);
 }
 </style>
