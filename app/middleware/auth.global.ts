@@ -7,14 +7,29 @@
  */
 import { useAuthStore } from '~/stores/auth';
 
+// API 和公开路径白名单 - 这些路径不需要认证
+const PUBLIC_PATHS = [
+  '/login',
+  '/bind-',
+  '/subscribe-',
+];
+
+// API 路径前缀白名单 - 这些 API 路由不会被前端中间件拦截
+const API_PREFIXES = [
+  '/v1/',
+  '/api/',
+  '/send/',
+  '/topic/',
+];
+
 export default defineNuxtRouteMiddleware((to) => {
-  // Skip auth check for login page
-  if (to.path === '/login') {
+  // Skip auth check for API routes (handled by backend)
+  if (API_PREFIXES.some(prefix => to.path.startsWith(prefix))) {
     return;
   }
 
-  // Skip auth check for bind/subscribe result pages (public)
-  if (to.path.startsWith('/bind-') || to.path.startsWith('/subscribe-')) {
+  // Skip auth check for public pages
+  if (PUBLIC_PATHS.some(path => to.path === path || to.path.startsWith(path))) {
     return;
   }
 
