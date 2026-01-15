@@ -32,12 +32,12 @@
   "dependencies": {
     "@iconify/vue": "^5.0.0",
     "@koa/router": "^15.2.0",
+    "@nuxt/ui": "^4.3.0",
     "@pinia/nuxt": "^0.9.0",
     "koa": "^3.1.1",
     "koa-bodyparser": "^4.4.1",
     "nuxt": "^4.2.2",
     "pinia": "^2.3.1",
-    "tdesign-vue-next": "^1.18.0",
     "vue": "^3.5.26",
     "vue-router": "^4.6.4"
   },
