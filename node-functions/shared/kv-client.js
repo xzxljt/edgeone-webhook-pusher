@@ -13,20 +13,8 @@
  */
 
 // Base URL for KV API (Edge Functions)
-// 本地调试时使用 localhost:8088，生产环境使用相对路径或完整域名
+// Node Functions 和 Edge Functions 运行在同一域下，使用相对路径即可
 function getDefaultBaseUrl() {
-  // 检测是否在本地开发环境
-  if (typeof process !== 'undefined' && process.env) {
-    // 优先使用环境变量
-    if (process.env.KV_BASE_URL) {
-      return process.env.KV_BASE_URL;
-    }
-    // 本地开发环境标识
-    if (process.env.NODE_ENV === 'development' || process.env.EDGEONE_LOCAL === 'true') {
-      return 'http://localhost:8088';
-    }
-  }
-  // 生产环境：使用空字符串表示相对路径（同域请求）
   return '';
 }
 
