@@ -105,7 +105,9 @@
             <UInput v-model="createForm.config.appSecret" type="password" placeholder="微信公众号 AppSecret" />
           </UFormField>
           <UAlert color="info" icon="i-heroicons-information-circle">
-            渠道用于配置消息发送通道，创建后可在应用中引用
+            <template #description>
+              渠道用于配置消息发送通道，创建后可在应用中引用
+            </template>
           </UAlert>
         </div>
       </template>

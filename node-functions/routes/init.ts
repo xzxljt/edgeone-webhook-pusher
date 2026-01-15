@@ -32,22 +32,13 @@ router.post('/', async (ctx: AppContext) => {
     throw ApiError.badRequest('Application is already initialized', ErrorCodes.INVALID_PARAM);
   }
 
-  // 解析可选的微信配置
-  const body = ctx.request.body as { wechat?: { appId?: string; appSecret?: string; templateId?: string } } | undefined;
-  const wechatConfig = body?.wechat;
-
   // 生成 Admin Token
   const adminToken = generateAdminToken();
   const timestamp = now();
 
-  // 创建初始配置
+  // 创建初始配置（不再包含 wechat 配置，微信配置在渠道中管理）
   const config: SystemConfig = {
     adminToken,
-    wechat: wechatConfig ? {
-      appId: wechatConfig.appId || '',
-      appSecret: wechatConfig.appSecret || '',
-      templateId: wechatConfig.templateId,
-    } : undefined,
     createdAt: timestamp,
     updatedAt: timestamp,
   };

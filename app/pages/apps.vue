@@ -118,7 +118,9 @@
             <UInput v-model="templateId" placeholder="微信模板消息 ID" />
           </UFormField>
           <UAlert color="info" icon="i-heroicons-information-circle">
-            创建后可通过 Webhook URL 发送消息
+            <template #description>
+              创建后可通过 Webhook URL 发送消息
+            </template>
           </UAlert>
         </div>
       </template>

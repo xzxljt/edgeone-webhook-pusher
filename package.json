@@ -47,6 +47,7 @@
     "@types/koa__router": "^12.0.4",
     "@types/node": "^25.0.6",
     "edgeone": "^1.2.22",
+    "fast-check": "^4.5.3",
     "rimraf": "^6.0.1",
     "tsx": "^4.21.0",
     "typescript": "^5.3.3",

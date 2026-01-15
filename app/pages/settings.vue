@@ -6,7 +6,7 @@
       <UIcon name="i-heroicons-arrow-path" class="text-3xl animate-spin text-gray-400" />
     </div>
 
-    <div v-else class="space-y-6 max-w-3xl">
+    <div v-else class="space-y-6">
       <!-- Channel Link -->
       <UCard>
         <template #header>
@@ -20,7 +20,9 @@
           </div>
         </template>
         <UAlert color="info" icon="i-heroicons-information-circle">
-          微信公众号配置已移至渠道管理，请在渠道管理中创建和配置微信渠道。
+          <template #description>
+            微信公众号配置已移至渠道管理，请在渠道管理中创建和配置微信渠道。
+          </template>
         </UAlert>
       </UCard>
 
