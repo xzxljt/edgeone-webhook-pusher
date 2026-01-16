@@ -7,7 +7,6 @@ export default {
     './app/plugins/**/*.{js,ts}',
     './app/app.vue',
     './app/error.vue',
-    './node_modules/preline/dist/*.js',
   ],
   darkMode: 'class',
   theme: {
