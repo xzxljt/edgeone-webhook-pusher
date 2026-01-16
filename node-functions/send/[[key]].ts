@@ -56,6 +56,9 @@ app.use(async (ctx, next) => {
 // 主处理逻辑
 app.use(async (ctx) => {
   const pathname = ctx.path;
+  console.log('\x1b[36m[Send]\x1b[0m Request path:', pathname);
+  console.log('\x1b[36m[Send]\x1b[0m Full URL:', ctx.url);
+  console.log('\x1b[36m[Send]\x1b[0m Method:', ctx.method);
 
   // 只允许 GET 和 POST
   if (ctx.method !== 'GET' && ctx.method !== 'POST') {
@@ -70,6 +73,8 @@ app.use(async (ctx) => {
 
   // 从 URL 提取 App Key
   const appKey = extractAppKey(pathname);
+  console.log('\x1b[36m[Send]\x1b[0m Extracted appKey:', appKey);
+  
   if (!appKey) {
     ctx.status = 400;
     ctx.body = {
@@ -122,7 +127,7 @@ app.use(async (ctx) => {
 
 /**
  * 从 URL 路径提取 App Key
- * 支持: /APKxxx.send 或 /send/APKxxx
+ * 支持: /APKxxx.send 或 /send/APKxxx 或 /APKxxx (EdgeOne catch-all)
  */
 function extractAppKey(pathname: string): string | null {
   // Pattern: /:appKey.send
@@ -135,6 +140,13 @@ function extractAppKey(pathname: string): string | null {
   const slashMatch = pathname.match(/\/send\/([^/]+)/);
   if (slashMatch) {
     return slashMatch[1];
+  }
+
+  // Pattern: /:appKey (EdgeOne catch-all route, path is just the key)
+  // 当 EdgeOne 使用 [[key]].ts 时，ctx.path 可能只是 /APKxxx
+  const directMatch = pathname.match(/^\/([A-Za-z0-9_-]+)$/);
+  if (directMatch && directMatch[1].startsWith('APK')) {
+    return directMatch[1];
   }
 
   return null;
