@@ -10,6 +10,7 @@ import { useAuthStore } from '~/stores/auth';
 // API 和公开路径白名单 - 这些路径不需要认证
 const PUBLIC_PATHS = [
   '/login',
+  '/admin/login',
   '/bind-',
   '/subscribe-',
 ];
@@ -23,6 +24,14 @@ const API_PREFIXES = [
 ];
 
 export default defineNuxtRouteMiddleware((to) => {
+  const config = useRuntimeConfig();
+  const isDemoMode = config.public.demoMode;
+
+  // 在体验模式下，根路径 / 不需要认证（体验前端）
+  if (isDemoMode && to.path === '/') {
+    return;
+  }
+
   // Skip auth check for API routes (handled by backend)
   if (API_PREFIXES.some(prefix => to.path.startsWith(prefix))) {
     return;
@@ -44,7 +53,9 @@ export default defineNuxtRouteMiddleware((to) => {
   auth.init();
 
   // Redirect to login if not authenticated
+  // 在体验模式下，重定向到 /admin/login
   if (!auth.isLoggedIn) {
-    return navigateTo('/login');
+    const loginPath = isDemoMode ? '/admin/login' : '/login';
+    return navigateTo(loginPath);
   }
 });

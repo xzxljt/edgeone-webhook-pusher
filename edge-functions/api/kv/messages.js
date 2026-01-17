@@ -3,7 +3,7 @@
 // KV Binding: MESSAGES_KV (configured in EdgeOne Pages)
 
 // BUILD_KEY 在构建时被替换为实际值
-const BUILD_KEY = '2722d2d41fd469f109f2bde721e01fd18526323e53e78e88684ddc6c77f30f6c';
+const BUILD_KEY = '2254b67931e78738d754c536e12492f441a05b4ea3f065b9f21f91398c23cc5e';
 
 /**
  * 验证内部 API 密钥
