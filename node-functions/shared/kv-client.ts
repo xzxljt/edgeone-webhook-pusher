@@ -19,12 +19,21 @@ import keyConfig from '../../shared/internal-key.json' with { type: 'json' };
 // Store for dynamic base URL (set from request context)
 let dynamicBaseUrl: string | null = null;
 
+function normalizeBaseUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.origin;
+  } catch {
+    return url.replace(/\/+$/, '');
+  }
+}
+
 /**
  * Set the base URL dynamically from request context
  * 用于在请求上下文中设置 baseUrl
  */
 export function setKVBaseUrl(url: string): void {
-  dynamicBaseUrl = url;
+  dynamicBaseUrl = normalizeBaseUrl(url);
 }
 
 /**
@@ -32,7 +41,11 @@ export function setKVBaseUrl(url: string): void {
  * 优先使用环境变量 KV_BASE_URL，其次使用动态设置的 baseUrl
  */
 function getBaseUrl(): string {
-  return process.env.KV_BASE_URL || dynamicBaseUrl || '';
+  const envBaseUrl = process.env.KV_BASE_URL;
+  if (envBaseUrl) {
+    return normalizeBaseUrl(envBaseUrl);
+  }
+  return dynamicBaseUrl || '';
 }
 
 /**
